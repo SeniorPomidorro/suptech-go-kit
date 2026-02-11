@@ -61,10 +61,14 @@ func (s *OperationsService) GetAlert(ctx context.Context, alertID string) (*Aler
 }
 
 // ListAlerts lists alerts with optional filters.
-func (s *OperationsService) ListAlerts(ctx context.Context, opts ListAlertsOptions) (*AlertsListResult, error) {
+func (s *OperationsService) ListAlerts(ctx context.Context, opts *ListAlertsOptions) (*AlertsListResult, error) {
 	path, err := s.client.opsPath("/alerts")
 	if err != nil {
 		return nil, err
+	}
+
+	if opts == nil {
+		opts = &ListAlertsOptions{}
 	}
 
 	query := url.Values{}
@@ -115,10 +119,14 @@ func (s *OperationsService) EnableOpsForTeam(ctx context.Context, teamID string)
 }
 
 // ListTeams lists teams in Jira Operations.
-func (s *OperationsService) ListTeams(ctx context.Context, opts ListTeamsOptions) (*TeamsListResult, error) {
+func (s *OperationsService) ListTeams(ctx context.Context, opts *ListTeamsOptions) (*TeamsListResult, error) {
 	path, err := s.client.opsPath("/teams")
 	if err != nil {
 		return nil, err
+	}
+
+	if opts == nil {
+		opts = &ListTeamsOptions{}
 	}
 
 	query := url.Values{}
@@ -148,7 +156,7 @@ func (s *OperationsService) ListTeams(ctx context.Context, opts ListTeamsOptions
 }
 
 // GetUserNotificationSettings returns operations notification settings for user.
-func (s *OperationsService) GetUserNotificationSettings(ctx context.Context, userID string, opts GetUserNotificationSettingsOptions) (*UserNotificationSettings, error) {
+func (s *OperationsService) GetUserNotificationSettings(ctx context.Context, userID string, opts *GetUserNotificationSettingsOptions) (*UserNotificationSettings, error) {
 	if strings.TrimSpace(userID) == "" {
 		return nil, errors.New("atlassian: user ID is required")
 	}
@@ -156,6 +164,10 @@ func (s *OperationsService) GetUserNotificationSettings(ctx context.Context, use
 	path, err := s.client.opsPath("/users/" + url.PathEscape(userID) + "/notification-settings")
 	if err != nil {
 		return nil, err
+	}
+
+	if opts == nil {
+		opts = &GetUserNotificationSettingsOptions{}
 	}
 
 	query := url.Values{}
@@ -176,10 +188,14 @@ func (s *OperationsService) GetUserNotificationSettings(ctx context.Context, use
 }
 
 // ListSchedules lists schedules.
-func (s *OperationsService) ListSchedules(ctx context.Context, opts ListSchedulesOptions) (*SchedulesListResult, error) {
+func (s *OperationsService) ListSchedules(ctx context.Context, opts *ListSchedulesOptions) (*SchedulesListResult, error) {
 	path, err := s.client.opsPath("/schedules")
 	if err != nil {
 		return nil, err
+	}
+
+	if opts == nil {
+		opts = &ListSchedulesOptions{}
 	}
 
 	query := url.Values{}
@@ -232,7 +248,7 @@ func (s *OperationsService) GetSchedule(ctx context.Context, scheduleID string) 
 }
 
 // ListOnCallResponders lists on-call responders for schedule.
-func (s *OperationsService) ListOnCallResponders(ctx context.Context, scheduleID string, opts ListOnCallRespondersOptions) ([]OnCallResponder, error) {
+func (s *OperationsService) ListOnCallResponders(ctx context.Context, scheduleID string, opts *ListOnCallRespondersOptions) ([]OnCallResponder, error) {
 	if strings.TrimSpace(scheduleID) == "" {
 		return nil, errors.New("atlassian: schedule ID is required")
 	}
@@ -240,6 +256,10 @@ func (s *OperationsService) ListOnCallResponders(ctx context.Context, scheduleID
 	path, err := s.client.opsPath("/schedules/" + url.PathEscape(scheduleID) + "/on-call/responders")
 	if err != nil {
 		return nil, err
+	}
+
+	if opts == nil {
+		opts = &ListOnCallRespondersOptions{}
 	}
 
 	query := url.Values{}

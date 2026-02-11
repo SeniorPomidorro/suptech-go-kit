@@ -39,7 +39,7 @@ func TestFindIssuesFetchAll(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	result, err := client.Issues().FindIssues(context.Background(), "project = ABC", FindIssuesOptions{
+	result, err := client.Issues().FindIssues(context.Background(), "project = ABC", &FindIssuesOptions{
 		PageSize: 2,
 		FetchAll: true,
 	})

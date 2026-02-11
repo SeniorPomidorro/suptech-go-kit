@@ -29,7 +29,7 @@ func TestFindUsers(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	users, err := client.Users().FindUsers(context.Background(), "john", FindUsersOptions{MaxResults: 5})
+	users, err := client.Users().FindUsers(context.Background(), "john", &FindUsersOptions{MaxResults: 5})
 	if err != nil {
 		t.Fatalf("FindUsers: %v", err)
 	}

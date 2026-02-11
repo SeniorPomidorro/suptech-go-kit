@@ -85,7 +85,7 @@ func TestSearchObjectsAQLFetchAll(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	result, err := client.Assets().SearchObjectsAQL(context.Background(), "Name LIKE server*", AssetsSearchOptions{
+	result, err := client.Assets().SearchObjectsAQL(context.Background(), "Name LIKE server*", &AssetsSearchOptions{
 		PageSize: 2,
 		FetchAll: true,
 	})

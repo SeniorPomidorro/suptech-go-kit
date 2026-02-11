@@ -23,9 +23,13 @@ type FindUsersOptions struct {
 }
 
 // FindUsers queries Jira users.
-func (s *UsersService) FindUsers(ctx context.Context, query string, opts FindUsersOptions) ([]User, error) {
+func (s *UsersService) FindUsers(ctx context.Context, query string, opts *FindUsersOptions) ([]User, error) {
 	if strings.TrimSpace(query) == "" {
 		return nil, errors.New("atlassian: query is required")
+	}
+
+	if opts == nil {
+		opts = &FindUsersOptions{}
 	}
 
 	params := url.Values{}

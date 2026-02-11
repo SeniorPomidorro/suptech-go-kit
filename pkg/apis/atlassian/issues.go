@@ -99,9 +99,13 @@ func (s *IssuesService) SaveStoryPoints(ctx context.Context, ticketKey string, p
 }
 
 // FindIssues executes JQL search and optionally fetches all pages.
-func (s *IssuesService) FindIssues(ctx context.Context, jql string, opts FindIssuesOptions) (*SearchResult, error) {
+func (s *IssuesService) FindIssues(ctx context.Context, jql string, opts *FindIssuesOptions) (*SearchResult, error) {
 	if strings.TrimSpace(jql) == "" {
 		return nil, errors.New("atlassian: jql is required")
+	}
+
+	if opts == nil {
+		opts = &FindIssuesOptions{}
 	}
 
 	pageSize := opts.PageSize

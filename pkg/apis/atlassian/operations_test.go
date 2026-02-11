@@ -79,7 +79,7 @@ func TestOperationsListAlertsQuery(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	result, err := client.Operations().ListAlerts(context.Background(), ListAlertsOptions{
+	result, err := client.Operations().ListAlerts(context.Background(), &ListAlertsOptions{
 		Query:  "status:open",
 		Limit:  10,
 		Offset: 20,
@@ -138,7 +138,7 @@ func TestOperationsEnableTeamAndSchedules(t *testing.T) {
 		t.Fatalf("EnableOpsForTeam failed: %v", err)
 	}
 
-	schedules, err := client.Operations().ListSchedules(context.Background(), ListSchedulesOptions{TeamID: "team-1"})
+	schedules, err := client.Operations().ListSchedules(context.Background(), &ListSchedulesOptions{TeamID: "team-1"})
 	if err != nil {
 		t.Fatalf("ListSchedules failed: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestOperationsEnableTeamAndSchedules(t *testing.T) {
 		t.Fatalf("unexpected schedules response: %+v", schedules.Values)
 	}
 
-	responders, err := client.Operations().ListOnCallResponders(context.Background(), "sch-1", ListOnCallRespondersOptions{
+	responders, err := client.Operations().ListOnCallResponders(context.Background(), "sch-1", &ListOnCallRespondersOptions{
 		From: "2026-01-01T00:00:00Z",
 		To:   "2026-01-01T12:00:00Z",
 	})
@@ -202,7 +202,7 @@ func TestOperationsGetMethods(t *testing.T) {
 		t.Fatalf("unexpected alert id: %q", alert.ID)
 	}
 
-	teams, err := client.Operations().ListTeams(context.Background(), ListTeamsOptions{})
+	teams, err := client.Operations().ListTeams(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("ListTeams failed: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestOperationsGetMethods(t *testing.T) {
 		t.Fatalf("unexpected teams response: %+v", teams.Values)
 	}
 
-	settings, err := client.Operations().GetUserNotificationSettings(context.Background(), "user-2", GetUserNotificationSettingsOptions{
+	settings, err := client.Operations().GetUserNotificationSettings(context.Background(), "user-2", &GetUserNotificationSettingsOptions{
 		TeamID: "team-2",
 	})
 	if err != nil {
@@ -240,7 +240,7 @@ func TestOperationsRequireCloudID(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	_, err = client.Operations().ListTeams(context.Background(), ListTeamsOptions{})
+	_, err = client.Operations().ListTeams(context.Background(), nil)
 	if err == nil || !strings.Contains(err.Error(), "operations cloud ID is required") {
 		t.Fatalf("expected missing cloud id error, got: %v", err)
 	}

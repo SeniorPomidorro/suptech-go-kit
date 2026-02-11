@@ -21,7 +21,7 @@ type AssetsService struct {
 }
 
 // SearchObjectsAQL searches assets objects using AQL query.
-func (s *AssetsService) SearchObjectsAQL(ctx context.Context, aql string, opts AssetsSearchOptions) (*AssetsSearchResult, error) {
+func (s *AssetsService) SearchObjectsAQL(ctx context.Context, aql string, opts *AssetsSearchOptions) (*AssetsSearchResult, error) {
 	if strings.TrimSpace(aql) == "" {
 		return nil, errors.New("atlassian: aql is required")
 	}
@@ -29,6 +29,10 @@ func (s *AssetsService) SearchObjectsAQL(ctx context.Context, aql string, opts A
 	path, err := s.client.assetsPath("/object/aql")
 	if err != nil {
 		return nil, err
+	}
+
+	if opts == nil {
+		opts = &AssetsSearchOptions{}
 	}
 
 	pageSize := opts.PageSize
