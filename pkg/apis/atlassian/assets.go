@@ -55,7 +55,7 @@ func (s *AssetsService) SearchObjectsAQL(ctx context.Context, aql string, opts A
 			payload["includeTypeAttributes"] = true
 		}
 
-		req, err := s.client.newRequest(ctx, http.MethodPost, path, nil, payload)
+		req, err := s.client.newCloudRequest(ctx, http.MethodPost, path, nil, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func (s *AssetsService) CreateObject(ctx context.Context, payload map[string]any
 		return nil, err
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodPost, path, nil, payload)
+	req, err := s.client.newCloudRequest(ctx, http.MethodPost, path, nil, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (s *AssetsService) DeleteObject(ctx context.Context, objectID string) error
 		return err
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodDelete, path, nil, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodDelete, path, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func (s *AssetsService) UpdateObject(ctx context.Context, objectID string, paylo
 		return nil, err
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodPut, path, nil, payload)
+	req, err := s.client.newCloudRequest(ctx, http.MethodPut, path, nil, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (s *AssetsService) GetObject(ctx context.Context, objectID string) (*AssetO
 		return nil, err
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodGet, path, nil, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
 	if err != nil {
 		return nil, err
 	}

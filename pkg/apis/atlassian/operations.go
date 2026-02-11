@@ -25,7 +25,7 @@ func (s *OperationsService) CreateAlert(ctx context.Context, payload map[string]
 		return nil, err
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodPost, path, nil, payload)
+	req, err := s.client.newCloudRequest(ctx, http.MethodPost, path, nil, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (s *OperationsService) GetAlert(ctx context.Context, alertID string) (*Aler
 		return nil, err
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodGet, path, nil, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *OperationsService) ListAlerts(ctx context.Context, opts ListAlertsOptio
 		query.Set("order", opts.Order)
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodGet, path, query, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (s *OperationsService) EnableOpsForTeam(ctx context.Context, teamID string)
 		return err
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodPost, path, nil, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodPost, path, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (s *OperationsService) ListTeams(ctx context.Context, opts ListTeamsOptions
 		query.Set("offset", strconv.Itoa(opts.Offset))
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodGet, path, query, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (s *OperationsService) GetUserNotificationSettings(ctx context.Context, use
 		query.Set("teamId", opts.TeamID)
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodGet, path, query, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (s *OperationsService) ListSchedules(ctx context.Context, opts ListSchedule
 		query.Set("offset", strconv.Itoa(opts.Offset))
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodGet, path, query, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func (s *OperationsService) GetSchedule(ctx context.Context, scheduleID string) 
 		return nil, err
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodGet, path, nil, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (s *OperationsService) ListOnCallResponders(ctx context.Context, scheduleID
 		query.Set("limit", strconv.Itoa(opts.Limit))
 	}
 
-	req, err := s.client.newRequest(ctx, http.MethodGet, path, query, nil)
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
 	if err != nil {
 		return nil, err
 	}

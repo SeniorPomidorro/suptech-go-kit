@@ -26,6 +26,7 @@ func TestGetObjectBuildsAssetsURL(t *testing.T) {
 
 	client, err := NewClient(
 		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
 		WithAssetsCloudID("cloud-1"),
 		WithAssetsWorkspaceID("ws-9"),
 		WithTransport(transport.New()),
@@ -75,6 +76,7 @@ func TestSearchObjectsAQLFetchAll(t *testing.T) {
 
 	client, err := NewClient(
 		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
 		WithAssetsCloudID("cloud-7"),
 		WithAssetsWorkspaceID("ws-7"),
 		WithTransport(transport.New()),

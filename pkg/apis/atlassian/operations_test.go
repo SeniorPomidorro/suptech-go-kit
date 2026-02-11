@@ -27,6 +27,7 @@ func TestOperationsCreateAlert(t *testing.T) {
 
 	client, err := NewClient(
 		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
 		WithOpsCloudID("cloud-1"),
 		WithTransport(transport.New()),
 	)
@@ -70,6 +71,7 @@ func TestOperationsListAlertsQuery(t *testing.T) {
 
 	client, err := NewClient(
 		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
 		WithOpsCloudID("cloud-1"),
 		WithTransport(transport.New()),
 	)
@@ -124,6 +126,7 @@ func TestOperationsEnableTeamAndSchedules(t *testing.T) {
 
 	client, err := NewClient(
 		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
 		WithAssetsCloudID("cloud-1"), // verifies fallback for operations cloud ID
 		WithTransport(transport.New()),
 	)
@@ -183,6 +186,7 @@ func TestOperationsGetMethods(t *testing.T) {
 
 	client, err := NewClient(
 		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
 		WithOpsCloudID("cloud-2"),
 		WithTransport(transport.New()),
 	)

@@ -15,6 +15,9 @@ import (
 	"github.com/SeniorPomidorro/suptech-go-kit/pkg/transport"
 )
 
+// DefaultCloudBaseURL is the base URL for Atlassian Cloud APIs (Assets, Operations).
+const DefaultCloudBaseURL = "https://api.atlassian.com"
+
 // AuthMode defines Jira authentication variant.
 type AuthMode string
 
@@ -36,6 +39,7 @@ type Option func(*config) error
 
 type config struct {
 	baseURL           string
+	cloudBaseURL      string
 	auth              Auth
 	transport         *transport.Client
 	assetsCloudID     string
@@ -46,6 +50,7 @@ type config struct {
 // Client is Atlassian/Jira HTTP API client.
 type Client struct {
 	baseURL           *url.URL
+	cloudBaseURL      *url.URL
 	auth              Auth
 	transport         *transport.Client
 	assetsCloudID     string
@@ -86,8 +91,18 @@ func NewClient(opts ...Option) (*Client, error) {
 		cfg.transport = transport.New()
 	}
 
+	cloudBase := strings.TrimSpace(cfg.cloudBaseURL)
+	if cloudBase == "" {
+		cloudBase = DefaultCloudBaseURL
+	}
+	parsedCloudURL, err := url.Parse(cloudBase)
+	if err != nil {
+		return nil, fmt.Errorf("atlassian: parse cloud base URL: %w", err)
+	}
+
 	client := &Client{
 		baseURL:           parsedURL,
+		cloudBaseURL:      parsedCloudURL,
 		auth:              cfg.auth,
 		transport:         cfg.transport,
 		assetsCloudID:     cfg.assetsCloudID,
@@ -125,6 +140,15 @@ func WithAuth(auth Auth) Option {
 func WithTransport(tr *transport.Client) Option {
 	return func(cfg *config) error {
 		cfg.transport = tr
+		return nil
+	}
+}
+
+// WithCloudBaseURL overrides the default Atlassian Cloud API base URL.
+// Useful for testing with mock servers. Defaults to DefaultCloudBaseURL.
+func WithCloudBaseURL(cloudBaseURL string) Option {
+	return func(cfg *config) error {
+		cfg.cloudBaseURL = cloudBaseURL
 		return nil
 	}
 }
@@ -173,7 +197,22 @@ func (c *Client) Operations() *OperationsService {
 	return c.operations
 }
 
+// newRequest creates an HTTP request resolved against the Jira base URL (issues, users, etc.).
 func (c *Client) newRequest(ctx context.Context, method, path string, query url.Values, body any) (*http.Request, error) {
+	return c.buildRequest(ctx, c.baseURL, method, path, query, body)
+}
+
+// newRawRequest creates a raw HTTP request resolved against the Jira base URL.
+func (c *Client) newRawRequest(ctx context.Context, method, path string, query url.Values, body []byte, contentType string) (*http.Request, error) {
+	return c.buildRawRequest(ctx, c.baseURL, method, path, query, body, contentType)
+}
+
+// newCloudRequest creates an HTTP request resolved against the Atlassian Cloud API base URL (assets, operations).
+func (c *Client) newCloudRequest(ctx context.Context, method, path string, query url.Values, body any) (*http.Request, error) {
+	return c.buildRequest(ctx, c.cloudBaseURL, method, path, query, body)
+}
+
+func (c *Client) buildRequest(ctx context.Context, baseURL *url.URL, method, path string, query url.Values, body any) (*http.Request, error) {
 	var payload []byte
 	if body != nil {
 		encoded, err := json.Marshal(body)
@@ -183,10 +222,10 @@ func (c *Client) newRequest(ctx context.Context, method, path string, query url.
 		payload = encoded
 	}
 
-	return c.newRawRequest(ctx, method, path, query, payload, "application/json")
+	return c.buildRawRequest(ctx, baseURL, method, path, query, payload, "application/json")
 }
 
-func (c *Client) newRawRequest(ctx context.Context, method, path string, query url.Values, body []byte, contentType string) (*http.Request, error) {
+func (c *Client) buildRawRequest(ctx context.Context, baseURL *url.URL, method, path string, query url.Values, body []byte, contentType string) (*http.Request, error) {
 	if c == nil {
 		return nil, errors.New("atlassian: client is nil")
 	}
@@ -196,7 +235,7 @@ func (c *Client) newRawRequest(ctx context.Context, method, path string, query u
 		rel = "/" + rel
 	}
 
-	endpoint := c.baseURL.ResolveReference(&url.URL{Path: rel})
+	endpoint := baseURL.ResolveReference(&url.URL{Path: rel})
 	endpoint.RawQuery = query.Encode()
 
 	var reader io.Reader
