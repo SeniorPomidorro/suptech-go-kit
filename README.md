@@ -1,5 +1,9 @@
 # suptech-go-kit
 
+[![Test](https://github.com/SeniorPomidorro/suptech-go-kit/actions/workflows/test.yml/badge.svg)](https://github.com/SeniorPomidorro/suptech-go-kit/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/SeniorPomidorro/suptech-go-kit)](https://goreportcard.com/report/github.com/SeniorPomidorro/suptech-go-kit)
+[![GoDoc](https://godoc.org/github.com/SeniorPomidorro/suptech-go-kit?status.svg)](https://godoc.org/github.com/SeniorPomidorro/suptech-go-kit)
+
 `suptech-go-kit` is a Go toolkit of API clients for common engineering integrations:
 
 - Atlassian (Jira Issues/Users, Jira Assets, Jira Operations)
