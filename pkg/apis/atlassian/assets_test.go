@@ -131,3 +131,157 @@ func TestAssetsPathRequiresCloudAndWorkspace(t *testing.T) {
 		t.Fatalf("expected workspace ID error, got: %v", err)
 	}
 }
+
+func TestAssetsSearchResultFindMethods(t *testing.T) {
+	t.Parallel()
+
+	result := &AssetsSearchResult{
+		Values: []AssetObject{
+			{ID: "1", ObjectKey: "KEY-1", Label: "Server 1"},
+			{ID: "2", ObjectKey: "KEY-2", Label: "Server 2"},
+			{ID: "3", ObjectKey: "KEY-3", Label: "Database"},
+		},
+	}
+
+	t.Run("FindObjectByID", func(t *testing.T) {
+		obj := result.FindObjectByID("2")
+		if obj == nil {
+			t.Fatal("expected to find object")
+		}
+		if obj.ID != "2" || obj.Label != "Server 2" {
+			t.Errorf("unexpected object: %+v", obj)
+		}
+
+		notFound := result.FindObjectByID("999")
+		if notFound != nil {
+			t.Error("expected nil for non-existent ID")
+		}
+	})
+
+	t.Run("FindObjectByKey", func(t *testing.T) {
+		obj := result.FindObjectByKey("KEY-3")
+		if obj == nil {
+			t.Fatal("expected to find object")
+		}
+		if obj.ObjectKey != "KEY-3" || obj.Label != "Database" {
+			t.Errorf("unexpected object: %+v", obj)
+		}
+
+		notFound := result.FindObjectByKey("KEY-999")
+		if notFound != nil {
+			t.Error("expected nil for non-existent key")
+		}
+	})
+
+	t.Run("FindObjectByLabel", func(t *testing.T) {
+		obj := result.FindObjectByLabel("Server 1")
+		if obj == nil {
+			t.Fatal("expected to find object")
+		}
+		if obj.Label != "Server 1" || obj.ID != "1" {
+			t.Errorf("unexpected object: %+v", obj)
+		}
+
+		notFound := result.FindObjectByLabel("NonExistent")
+		if notFound != nil {
+			t.Error("expected nil for non-existent label")
+		}
+	})
+
+	t.Run("ObjectEntries fallback", func(t *testing.T) {
+		resultWithEntries := &AssetsSearchResult{
+			ObjectEntries: []AssetObject{
+				{ID: "10", ObjectKey: "KEY-10", Label: "Entry 1"},
+			},
+		}
+
+		obj := resultWithEntries.FindObjectByID("10")
+		if obj == nil || obj.ID != "10" {
+			t.Error("expected to find object in ObjectEntries")
+		}
+	})
+}
+
+func TestAssetObjectAttributeMethods(t *testing.T) {
+	t.Parallel()
+
+	obj := &AssetObject{
+		ID:    "911",
+		Label: "Test Object",
+		Attributes: []AssetObjectAttr{
+			{
+				ObjectTypeAttributeID: "402",
+				ObjectAttributeValues: []AssetAttributeValue{
+					{DisplayValue: "ServiceDesk Team", Value: "ServiceDesk Team"},
+				},
+			},
+			{
+				ObjectTypeAttributeID: "454",
+				ObjectAttributeValues: []AssetAttributeValue{
+					{
+						DisplayValue: "Sergey Rostovskiy",
+						SearchValue:  "61f983b2845d670071f2c97d",
+						User: &AssetAttributeUser{
+							DisplayName:  "Sergey Rostovskiy",
+							EmailAddress: "sergey.rostovskiy@tabby.ai",
+							Key:          "61f983b2845d670071f2c97d",
+						},
+					},
+				},
+			},
+			{
+				ObjectTypeAttributeID: "449",
+				ObjectAttributeValues: []AssetAttributeValue{
+					{DisplayValue: "Value 1", Value: "v1"},
+					{DisplayValue: "Value 2", Value: "v2"},
+				},
+			},
+		},
+	}
+
+	t.Run("GetAttributeByID", func(t *testing.T) {
+		attr := obj.GetAttributeByID("402")
+		if attr == nil {
+			t.Fatal("expected to find attribute")
+		}
+		if attr.ObjectTypeAttributeID != "402" {
+			t.Errorf("unexpected attribute ID: %s", attr.ObjectTypeAttributeID)
+		}
+		if len(attr.ObjectAttributeValues) != 1 {
+			t.Errorf("expected 1 value, got %d", len(attr.ObjectAttributeValues))
+		}
+
+		notFound := obj.GetAttributeByID("999")
+		if notFound != nil {
+			t.Error("expected nil for non-existent attribute ID")
+		}
+	})
+
+	t.Run("GetAttributeValues", func(t *testing.T) {
+		values := obj.GetAttributeValues("449")
+		if len(values) != 2 {
+			t.Fatalf("expected 2 values, got %d", len(values))
+		}
+		if values[0].DisplayValue != "Value 1" || values[1].DisplayValue != "Value 2" {
+			t.Errorf("unexpected values: %+v", values)
+		}
+
+		notFound := obj.GetAttributeValues("999")
+		if notFound != nil {
+			t.Error("expected nil for non-existent attribute ID")
+		}
+	})
+
+	t.Run("GetAttributeValues with User", func(t *testing.T) {
+		values := obj.GetAttributeValues("454")
+		if len(values) != 1 {
+			t.Fatalf("expected 1 value, got %d", len(values))
+		}
+		if values[0].User == nil {
+			t.Fatal("expected user to be present")
+		}
+		if values[0].User.EmailAddress != "sergey.rostovskiy@tabby.ai" {
+			t.Errorf("unexpected email: %s", values[0].User.EmailAddress)
+		}
+	})
+}
