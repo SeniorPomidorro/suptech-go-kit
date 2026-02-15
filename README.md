@@ -78,6 +78,27 @@ if err != nil {
 	panic(err)
 }
 _ = issue
+
+// Create asset with structured types
+payload := atlassian.NewCreateAssetObjectRequest(atlassian.AssetObjectInput{
+	ObjectTypeID: "123",
+	Attributes: []atlassian.AssetAttributeInput{
+		{
+			ObjectTypeAttributeID: "135",
+			Values:                []string{"NY-1"},
+		},
+		{
+			ObjectTypeAttributeID: "144",
+			Values:                []string{"99"},
+		},
+	},
+})
+
+asset, err := jira.Assets().CreateObject(ctx, payload)
+if err != nil {
+	panic(err)
+}
+_ = asset
 ```
 
 ### 3) Slack client
@@ -144,6 +165,8 @@ _ = raw
 - Issues: `GetIssue`, `SaveStoryPoints`, `FindIssues` (`FetchAll`), `ManageTags`, `CreateComment`, `AddAttachment`
 - Users: `FindUsers`
 - Assets: `SearchObjectsAQL` (`FetchAll`), `CreateObject`, `DeleteObject`, `UpdateObject`, `GetObject`
+  - Structured request types: `CreateAssetObjectRequest`, `UpdateAssetObjectRequest`
+  - Simplified factory functions: `NewCreateAssetObjectRequest`, `NewUpdateAssetObjectRequest`
 - Operations: `CreateAlert`, `GetAlert`, `ListAlerts`, `EnableOpsForTeam`, `ListTeams`, `GetUserNotificationSettings`, `ListSchedules`, `GetSchedule`, `ListOnCallResponders`
 
 ### `pkg/apis/slack`

@@ -285,3 +285,298 @@ func TestAssetObjectAttributeMethods(t *testing.T) {
 		}
 	})
 }
+
+func TestCreateObject(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/ex/jira/cloud-1/jsm/assets/workspace/ws-1/v1/object/create" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		var payload CreateAssetObjectRequest
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
+		}
+
+		if payload.ObjectTypeID != "123" {
+			t.Fatalf("unexpected objectTypeId: %q", payload.ObjectTypeID)
+		}
+		if len(payload.Attributes) != 2 {
+			t.Fatalf("expected 2 attributes, got %d", len(payload.Attributes))
+		}
+		if payload.Attributes[0].ObjectTypeAttributeID != "135" {
+			t.Fatalf("unexpected first attribute ID: %q", payload.Attributes[0].ObjectTypeAttributeID)
+		}
+		if len(payload.Attributes[0].ObjectAttributeValues) != 1 {
+			t.Fatalf("expected 1 value in first attribute, got %d", len(payload.Attributes[0].ObjectAttributeValues))
+		}
+		if payload.Attributes[0].ObjectAttributeValues[0].Value != "NY-1" {
+			t.Fatalf("unexpected value: %q", payload.Attributes[0].ObjectAttributeValues[0].Value)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"999","objectKey":"OBJ-999","label":"Created Object"}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	payload := &CreateAssetObjectRequest{
+		ObjectTypeID: "123",
+		Attributes: []CreateAssetObjectAttribute{
+			{
+				ObjectTypeAttributeID: "135",
+				ObjectAttributeValues: []CreateAssetAttributeValue{
+					{Value: "NY-1"},
+				},
+			},
+			{
+				ObjectTypeAttributeID: "144",
+				ObjectAttributeValues: []CreateAssetAttributeValue{
+					{Value: "99"},
+				},
+			},
+		},
+	}
+
+	object, err := client.Assets().CreateObject(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("CreateObject failed: %v", err)
+	}
+	if object.ID != "999" {
+		t.Fatalf("unexpected object ID: %q", object.ID)
+	}
+	if object.ObjectKey != "OBJ-999" {
+		t.Fatalf("unexpected object key: %q", object.ObjectKey)
+	}
+}
+
+func TestCreateObjectValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(
+		WithBaseURL("https://example.atlassian.net"),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	t.Run("nil payload", func(t *testing.T) {
+		_, err := client.Assets().CreateObject(context.Background(), nil)
+		if err == nil || !strings.Contains(err.Error(), "payload is required") {
+			t.Fatalf("expected payload error, got: %v", err)
+		}
+	})
+
+	t.Run("empty objectTypeId", func(t *testing.T) {
+		_, err := client.Assets().CreateObject(context.Background(), &CreateAssetObjectRequest{})
+		if err == nil || !strings.Contains(err.Error(), "objectTypeId is required") {
+			t.Fatalf("expected objectTypeId error, got: %v", err)
+		}
+	})
+}
+
+func TestUpdateObject(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/ex/jira/cloud-1/jsm/assets/workspace/ws-1/v1/object/42" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		var payload UpdateAssetObjectRequest
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
+		}
+
+		if len(payload.Attributes) != 1 {
+			t.Fatalf("expected 1 attribute, got %d", len(payload.Attributes))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"42","objectKey":"OBJ-42","label":"Updated Object"}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	payload := &UpdateAssetObjectRequest{
+		Attributes: []CreateAssetObjectAttribute{
+			{
+				ObjectTypeAttributeID: "135",
+				ObjectAttributeValues: []CreateAssetAttributeValue{
+					{Value: "NY-2"},
+				},
+			},
+		},
+	}
+
+	object, err := client.Assets().UpdateObject(context.Background(), "42", payload)
+	if err != nil {
+		t.Fatalf("UpdateObject failed: %v", err)
+	}
+	if object.ID != "42" {
+		t.Fatalf("unexpected object ID: %q", object.ID)
+	}
+}
+
+func TestUpdateObjectValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(
+		WithBaseURL("https://example.atlassian.net"),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	t.Run("empty objectId", func(t *testing.T) {
+		_, err := client.Assets().UpdateObject(context.Background(), "", &UpdateAssetObjectRequest{})
+		if err == nil || !strings.Contains(err.Error(), "object ID is required") {
+			t.Fatalf("expected object ID error, got: %v", err)
+		}
+	})
+
+	t.Run("nil payload", func(t *testing.T) {
+		_, err := client.Assets().UpdateObject(context.Background(), "42", nil)
+		if err == nil || !strings.Contains(err.Error(), "payload is required") {
+			t.Fatalf("expected payload error, got: %v", err)
+		}
+	})
+}
+
+func TestDeleteObject(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/ex/jira/cloud-1/jsm/assets/workspace/ws-1/v1/object/42" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	err = client.Assets().DeleteObject(context.Background(), "42")
+	if err != nil {
+		t.Fatalf("DeleteObject failed: %v", err)
+	}
+}
+
+func TestNewCreateAssetObjectRequest(t *testing.T) {
+	t.Parallel()
+
+	input := AssetObjectInput{
+		ObjectTypeID: "123",
+		Attributes: []AssetAttributeInput{
+			{
+				ObjectTypeAttributeID: "135",
+				Values:                []string{"NY-1", "NY-2"},
+			},
+			{
+				ObjectTypeAttributeID: "144",
+				Values:                []string{"99"},
+			},
+		},
+	}
+
+	req := NewCreateAssetObjectRequest(input)
+
+	if req.ObjectTypeID != "123" {
+		t.Fatalf("unexpected objectTypeId: %q", req.ObjectTypeID)
+	}
+	if len(req.Attributes) != 2 {
+		t.Fatalf("expected 2 attributes, got %d", len(req.Attributes))
+	}
+	if req.Attributes[0].ObjectTypeAttributeID != "135" {
+		t.Fatalf("unexpected first attribute ID: %q", req.Attributes[0].ObjectTypeAttributeID)
+	}
+	if len(req.Attributes[0].ObjectAttributeValues) != 2 {
+		t.Fatalf("expected 2 values in first attribute, got %d", len(req.Attributes[0].ObjectAttributeValues))
+	}
+	if req.Attributes[0].ObjectAttributeValues[0].Value != "NY-1" {
+		t.Fatalf("unexpected first value: %q", req.Attributes[0].ObjectAttributeValues[0].Value)
+	}
+	if req.Attributes[0].ObjectAttributeValues[1].Value != "NY-2" {
+		t.Fatalf("unexpected second value: %q", req.Attributes[0].ObjectAttributeValues[1].Value)
+	}
+	if len(req.Attributes[1].ObjectAttributeValues) != 1 {
+		t.Fatalf("expected 1 value in second attribute, got %d", len(req.Attributes[1].ObjectAttributeValues))
+	}
+}
+
+func TestNewUpdateAssetObjectRequest(t *testing.T) {
+	t.Parallel()
+
+	input := AssetObjectInput{
+		ObjectTypeID: "456",
+		Attributes: []AssetAttributeInput{
+			{
+				ObjectTypeAttributeID: "200",
+				Values:                []string{"Updated Value"},
+			},
+		},
+	}
+
+	req := NewUpdateAssetObjectRequest(input)
+
+	if req.ObjectTypeID != "456" {
+		t.Fatalf("unexpected objectTypeId: %q", req.ObjectTypeID)
+	}
+	if len(req.Attributes) != 1 {
+		t.Fatalf("expected 1 attribute, got %d", len(req.Attributes))
+	}
+	if req.Attributes[0].ObjectTypeAttributeID != "200" {
+		t.Fatalf("unexpected attribute ID: %q", req.Attributes[0].ObjectTypeAttributeID)
+	}
+	if len(req.Attributes[0].ObjectAttributeValues) != 1 {
+		t.Fatalf("expected 1 value, got %d", len(req.Attributes[0].ObjectAttributeValues))
+	}
+	if req.Attributes[0].ObjectAttributeValues[0].Value != "Updated Value" {
+		t.Fatalf("unexpected value: %q", req.Attributes[0].ObjectAttributeValues[0].Value)
+	}
+}

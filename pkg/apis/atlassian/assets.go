@@ -88,9 +88,12 @@ func (s *AssetsService) SearchObjectsAQL(ctx context.Context, aql string, opts *
 }
 
 // CreateObject creates a Jira Assets object.
-func (s *AssetsService) CreateObject(ctx context.Context, payload map[string]any) (*AssetObject, error) {
-	if len(payload) == 0 {
+func (s *AssetsService) CreateObject(ctx context.Context, payload *CreateAssetObjectRequest) (*AssetObject, error) {
+	if payload == nil {
 		return nil, errors.New("atlassian: create object payload is required")
+	}
+	if strings.TrimSpace(payload.ObjectTypeID) == "" {
+		return nil, errors.New("atlassian: objectTypeId is required")
 	}
 
 	path, err := s.client.assetsPath("/object/create")
@@ -129,11 +132,11 @@ func (s *AssetsService) DeleteObject(ctx context.Context, objectID string) error
 }
 
 // UpdateObject updates Jira Assets object.
-func (s *AssetsService) UpdateObject(ctx context.Context, objectID string, payload map[string]any) (*AssetObject, error) {
+func (s *AssetsService) UpdateObject(ctx context.Context, objectID string, payload *UpdateAssetObjectRequest) (*AssetObject, error) {
 	if strings.TrimSpace(objectID) == "" {
 		return nil, errors.New("atlassian: object ID is required")
 	}
-	if len(payload) == 0 {
+	if payload == nil {
 		return nil, errors.New("atlassian: update object payload is required")
 	}
 

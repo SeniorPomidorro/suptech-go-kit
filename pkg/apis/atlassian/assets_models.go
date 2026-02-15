@@ -145,3 +145,80 @@ func (o *AssetObject) GetAttributeValues(attributeID string) []AssetAttributeVal
 	}
 	return attr.ObjectAttributeValues
 }
+
+// CreateAssetObjectRequest represents the payload for creating an asset object.
+type CreateAssetObjectRequest struct {
+	ObjectTypeID string                        `json:"objectTypeId"`
+	Attributes   []CreateAssetObjectAttribute  `json:"attributes"`
+}
+
+// CreateAssetObjectAttribute represents a single attribute in the create request.
+type CreateAssetObjectAttribute struct {
+	ObjectTypeAttributeID string                      `json:"objectTypeAttributeId"`
+	ObjectAttributeValues []CreateAssetAttributeValue `json:"objectAttributeValues"`
+}
+
+// CreateAssetAttributeValue represents a single value in the create request.
+type CreateAssetAttributeValue struct {
+	Value string `json:"value"`
+}
+
+// UpdateAssetObjectRequest represents the payload for updating an asset object.
+type UpdateAssetObjectRequest struct {
+	ObjectTypeID string                        `json:"objectTypeId,omitempty"`
+	Attributes   []CreateAssetObjectAttribute  `json:"attributes,omitempty"`
+}
+
+// AssetObjectInput is a simplified input for building CreateAssetObjectRequest or UpdateAssetObjectRequest.
+type AssetObjectInput struct {
+	ObjectTypeID string
+	Attributes   []AssetAttributeInput
+}
+
+// AssetAttributeInput is a simplified attribute input with string slice values.
+type AssetAttributeInput struct {
+	ObjectTypeAttributeID string
+	Values                []string
+}
+
+// NewCreateAssetObjectRequest builds a CreateAssetObjectRequest from simplified input.
+func NewCreateAssetObjectRequest(input AssetObjectInput) *CreateAssetObjectRequest {
+	req := &CreateAssetObjectRequest{
+		ObjectTypeID: input.ObjectTypeID,
+		Attributes:   make([]CreateAssetObjectAttribute, 0, len(input.Attributes)),
+	}
+
+	for _, attr := range input.Attributes {
+		values := make([]CreateAssetAttributeValue, 0, len(attr.Values))
+		for _, v := range attr.Values {
+			values = append(values, CreateAssetAttributeValue{Value: v})
+		}
+		req.Attributes = append(req.Attributes, CreateAssetObjectAttribute{
+			ObjectTypeAttributeID: attr.ObjectTypeAttributeID,
+			ObjectAttributeValues: values,
+		})
+	}
+
+	return req
+}
+
+// NewUpdateAssetObjectRequest builds an UpdateAssetObjectRequest from simplified input.
+func NewUpdateAssetObjectRequest(input AssetObjectInput) *UpdateAssetObjectRequest {
+	req := &UpdateAssetObjectRequest{
+		ObjectTypeID: input.ObjectTypeID,
+		Attributes:   make([]CreateAssetObjectAttribute, 0, len(input.Attributes)),
+	}
+
+	for _, attr := range input.Attributes {
+		values := make([]CreateAssetAttributeValue, 0, len(attr.Values))
+		for _, v := range attr.Values {
+			values = append(values, CreateAssetAttributeValue{Value: v})
+		}
+		req.Attributes = append(req.Attributes, CreateAssetObjectAttribute{
+			ObjectTypeAttributeID: attr.ObjectTypeAttributeID,
+			ObjectAttributeValues: values,
+		})
+	}
+
+	return req
+}
