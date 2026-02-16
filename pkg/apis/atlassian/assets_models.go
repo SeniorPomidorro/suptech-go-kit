@@ -87,6 +87,21 @@ type AssetReferencedObject struct {
 	ObjectType *AssetObjectType `json:"objectType,omitempty"`
 }
 
+// ObjectSchema represents a Jira Assets object schema.
+type ObjectSchema struct {
+	WorkspaceID     string `json:"workspaceId,omitempty"`
+	GlobalID        string `json:"globalId,omitempty"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	ObjectSchemaKey string `json:"objectSchemaKey"`
+	Status          string `json:"status,omitempty"`
+	Description     string `json:"description,omitempty"`
+	Created         string `json:"created,omitempty"`
+	Updated         string `json:"updated,omitempty"`
+	ObjectCount     int    `json:"objectCount,omitempty"`
+	ObjectTypeCount int    `json:"objectTypeCount,omitempty"`
+}
+
 func (r AssetsSearchResult) objects() []AssetObject {
 	if len(r.Values) > 0 {
 		return r.Values

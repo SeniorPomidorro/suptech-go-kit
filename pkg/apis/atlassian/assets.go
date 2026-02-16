@@ -196,6 +196,29 @@ func (s *AssetsService) GetObject(ctx context.Context, objectID string) (*AssetO
 	return &object, nil
 }
 
+// GetObjectSchema fetches a Jira Assets object schema by ID.
+func (s *AssetsService) GetObjectSchema(ctx context.Context, schemaID string) (*ObjectSchema, error) {
+	if strings.TrimSpace(schemaID) == "" {
+		return nil, errors.New("atlassian: schema ID is required")
+	}
+
+	path, err := s.client.assetsPath("/objectschema/" + url.PathEscape(schemaID))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var schema ObjectSchema
+	if err := s.client.transport.DoJSON(req, &schema); err != nil {
+		return nil, err
+	}
+	return &schema, nil
+}
+
 func (c *Client) assetsPath(pathSuffix string) (string, error) {
 	if strings.TrimSpace(c.assetsCloudID) == "" {
 		return "", errors.New("atlassian: assets cloud ID is required")
