@@ -102,6 +102,27 @@ type ObjectSchema struct {
 	ObjectTypeCount int    `json:"objectTypeCount,omitempty"`
 }
 
+// ObjectTypeEntry represents a single object type within a schema.
+type ObjectTypeEntry struct {
+	WorkspaceID        string `json:"workspaceId,omitempty"`
+	GlobalID           string `json:"globalId,omitempty"`
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	Description        string `json:"description,omitempty"`
+	IconID             string `json:"iconId,omitempty"`
+	Position           int    `json:"position"`
+	ObjectCount        int    `json:"objectCount"`
+	ObjectSchemaID     string `json:"objectSchemaId,omitempty"`
+	Inherited          bool   `json:"inherited"`
+	AbstractObjectType bool   `json:"abstractObjectType"`
+	ParentObjectTypeID string `json:"parentObjectTypeId,omitempty"`
+}
+
+// ObjectSchemaList represents a paginated list of object schemas.
+type ObjectSchemaList struct {
+	Values []ObjectSchema `json:"values"`
+}
+
 func (r AssetsSearchResult) objects() []AssetObject {
 	if len(r.Values) > 0 {
 		return r.Values

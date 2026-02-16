@@ -549,6 +549,125 @@ func TestNewCreateAssetObjectRequest(t *testing.T) {
 	}
 }
 
+func TestGetSchemaObjectTypes(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		wantPath := "/ex/jira/cloud-1/jsm/assets/workspace/ws-1/v1/objectschema/6/objecttypes/flat"
+		if r.URL.Path != wantPath {
+			t.Fatalf("unexpected path: got=%s want=%s", r.URL.Path, wantPath)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{"id":"1","name":"Server","objectCount":42,"position":0},
+			{"id":"2","name":"Database","objectCount":15,"position":1},
+			{"id":"3","name":"Network Device","objectCount":7,"position":2}
+		]`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	entries, err := client.Assets().GetSchemaObjectTypes(context.Background(), "6")
+	if err != nil {
+		t.Fatalf("GetSchemaObjectTypes failed: %v", err)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+	if entries[0].ID != "1" || entries[0].Name != "Server" || entries[0].ObjectCount != 42 {
+		t.Fatalf("unexpected first entry: %+v", entries[0])
+	}
+	if entries[1].ID != "2" || entries[1].Name != "Database" || entries[1].ObjectCount != 15 {
+		t.Fatalf("unexpected second entry: %+v", entries[1])
+	}
+	if entries[2].Position != 2 {
+		t.Fatalf("unexpected third entry position: %d", entries[2].Position)
+	}
+}
+
+func TestGetSchemaObjectTypesValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(
+		WithBaseURL("https://example.atlassian.net"),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	_, err = client.Assets().GetSchemaObjectTypes(context.Background(), "")
+	if err == nil || !strings.Contains(err.Error(), "schema ID is required") {
+		t.Fatalf("expected schema ID error, got: %v", err)
+	}
+}
+
+func TestListObjectSchemas(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		wantPath := "/ex/jira/cloud-1/jsm/assets/workspace/ws-1/v1/objectschema/list"
+		if r.URL.Path != wantPath {
+			t.Fatalf("unexpected path: got=%s want=%s", r.URL.Path, wantPath)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"values":[
+			{"id":"6","name":"IT Assets","objectSchemaKey":"ITA","objectCount":100,"objectTypeCount":5},
+			{"id":"7","name":"HR Assets","objectSchemaKey":"HRA","objectCount":50,"objectTypeCount":3}
+		]}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	list, err := client.Assets().ListObjectSchemas(context.Background())
+	if err != nil {
+		t.Fatalf("ListObjectSchemas failed: %v", err)
+	}
+	if len(list.Values) != 2 {
+		t.Fatalf("expected 2 schemas, got %d", len(list.Values))
+	}
+	if list.Values[0].ID != "6" || list.Values[0].Name != "IT Assets" {
+		t.Fatalf("unexpected first schema: %+v", list.Values[0])
+	}
+	if list.Values[0].ObjectSchemaKey != "ITA" {
+		t.Fatalf("unexpected schema key: %q", list.Values[0].ObjectSchemaKey)
+	}
+	if list.Values[0].ObjectCount != 100 || list.Values[0].ObjectTypeCount != 5 {
+		t.Fatalf("unexpected counts: objectCount=%d objectTypeCount=%d", list.Values[0].ObjectCount, list.Values[0].ObjectTypeCount)
+	}
+	if list.Values[1].ID != "7" || list.Values[1].Name != "HR Assets" {
+		t.Fatalf("unexpected second schema: %+v", list.Values[1])
+	}
+}
+
 func TestNewUpdateAssetObjectRequest(t *testing.T) {
 	t.Parallel()
 

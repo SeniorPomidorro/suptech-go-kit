@@ -219,6 +219,48 @@ func (s *AssetsService) GetObjectSchema(ctx context.Context, schemaID string) (*
 	return &schema, nil
 }
 
+// GetSchemaObjectTypes returns a flat list of object types for the given schema.
+func (s *AssetsService) GetSchemaObjectTypes(ctx context.Context, schemaID string) ([]ObjectTypeEntry, error) {
+	if strings.TrimSpace(schemaID) == "" {
+		return nil, errors.New("atlassian: schema ID is required")
+	}
+
+	path, err := s.client.assetsPath("/objectschema/" + url.PathEscape(schemaID) + "/objecttypes/flat")
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []ObjectTypeEntry
+	if err := s.client.transport.DoJSON(req, &entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+// ListObjectSchemas returns all object schemas visible to the caller.
+func (s *AssetsService) ListObjectSchemas(ctx context.Context) (*ObjectSchemaList, error) {
+	path, err := s.client.assetsPath("/objectschema/list")
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var list ObjectSchemaList
+	if err := s.client.transport.DoJSON(req, &list); err != nil {
+		return nil, err
+	}
+	return &list, nil
+}
+
 func (c *Client) assetsPath(pathSuffix string) (string, error) {
 	if strings.TrimSpace(c.assetsCloudID) == "" {
 		return "", errors.New("atlassian: assets cloud ID is required")
