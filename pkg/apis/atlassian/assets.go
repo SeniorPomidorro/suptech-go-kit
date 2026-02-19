@@ -261,6 +261,29 @@ func (s *AssetsService) ListObjectSchemas(ctx context.Context) (*ObjectSchemaLis
 	return &list, nil
 }
 
+// GetObjectTypeAttributes returns attribute definitions for the given object type.
+func (s *AssetsService) GetObjectTypeAttributes(ctx context.Context, objectTypeID string) ([]ObjectTypeAttribute, error) {
+	if strings.TrimSpace(objectTypeID) == "" {
+		return nil, errors.New("atlassian: object type ID is required")
+	}
+
+	path, err := s.client.assetsPath("/objecttype/" + url.PathEscape(objectTypeID) + "/attributes")
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var attrs []ObjectTypeAttribute
+	if err := s.client.transport.DoJSON(req, &attrs); err != nil {
+		return nil, err
+	}
+	return attrs, nil
+}
+
 func (c *Client) assetsPath(pathSuffix string) (string, error) {
 	if strings.TrimSpace(c.assetsCloudID) == "" {
 		return "", errors.New("atlassian: assets cloud ID is required")

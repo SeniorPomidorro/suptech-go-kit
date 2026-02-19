@@ -668,6 +668,77 @@ func TestListObjectSchemas(t *testing.T) {
 	}
 }
 
+func TestGetObjectTypeAttributes(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		wantPath := "/ex/jira/cloud-1/jsm/assets/workspace/ws-1/v1/objecttype/42/attributes"
+		if r.URL.Path != wantPath {
+			t.Fatalf("unexpected path: got=%s want=%s", r.URL.Path, wantPath)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{"id":"1","name":"Name","type":0,"defaultType":{"id":0,"name":"Text"},"editable":true,"system":true,"position":0},
+			{"id":"2","name":"Owner","type":2,"editable":true,"system":false,"position":1},
+			{"id":"3","name":"Parent Rack","type":1,"editable":true,"referenceObjectTypeId":"99","position":2}
+		]`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	attrs, err := client.Assets().GetObjectTypeAttributes(context.Background(), "42")
+	if err != nil {
+		t.Fatalf("GetObjectTypeAttributes failed: %v", err)
+	}
+	if len(attrs) != 3 {
+		t.Fatalf("expected 3 attributes, got %d", len(attrs))
+	}
+	if attrs[0].ID != "1" || attrs[0].Name != "Name" || attrs[0].Type != 0 {
+		t.Fatalf("unexpected first attr: %+v", attrs[0])
+	}
+	if attrs[0].DefaultType == nil || attrs[0].DefaultType.ID != 0 || attrs[0].DefaultType.Name != "Text" {
+		t.Fatalf("unexpected first attr default type: %+v", attrs[0].DefaultType)
+	}
+	if attrs[1].ID != "2" || attrs[1].Name != "Owner" || attrs[1].Type != 2 {
+		t.Fatalf("unexpected second attr: %+v", attrs[1])
+	}
+	if attrs[2].ReferenceObjectTypeID != "99" {
+		t.Fatalf("unexpected reference object type ID: %q", attrs[2].ReferenceObjectTypeID)
+	}
+}
+
+func TestGetObjectTypeAttributesValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(
+		WithBaseURL("https://example.atlassian.net"),
+		WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	_, err = client.Assets().GetObjectTypeAttributes(context.Background(), "")
+	if err == nil || !strings.Contains(err.Error(), "object type ID is required") {
+		t.Fatalf("expected object type ID error, got: %v", err)
+	}
+}
+
 func TestNewUpdateAssetObjectRequest(t *testing.T) {
 	t.Parallel()
 

@@ -238,6 +238,46 @@ func NewCreateAssetObjectRequest(input AssetObjectInput) *CreateAssetObjectReque
 	return req
 }
 
+// ObjectTypeAttribute represents an attribute definition for an object type.
+type ObjectTypeAttribute struct {
+	WorkspaceID             string         `json:"workspaceId,omitempty"`
+	GlobalID                string         `json:"globalId,omitempty"`
+	ID                      string         `json:"id"`
+	Name                    string         `json:"name"`
+	Label                   bool           `json:"label"`
+	Description             string         `json:"description,omitempty"`
+	Type                    int            `json:"type"`
+	DefaultType             *AttributeType `json:"defaultType,omitempty"`
+	Editable                bool           `json:"editable"`
+	System                  bool           `json:"system"`
+	Sortable                bool           `json:"sortable"`
+	Summable                bool           `json:"summable"`
+	Indexed                 bool           `json:"indexed"`
+	MinimumCardinality      int            `json:"minimumCardinality"`
+	MaximumCardinality      int            `json:"maximumCardinality"`
+	Removable               bool           `json:"removable"`
+	Hidden                  bool           `json:"hidden"`
+	IncludeChildObjectTypes bool           `json:"includeChildObjectTypes"`
+	UniqueAttribute         bool           `json:"uniqueAttribute"`
+	Options                 string         `json:"options,omitempty"`
+	Position                int            `json:"position"`
+	ReferenceObjectTypeID   string         `json:"referenceObjectTypeId,omitempty"`
+	ReferenceType           *ReferenceType `json:"referenceType,omitempty"`
+}
+
+// AttributeType represents the default sub-type of an attribute (for Type=0).
+type AttributeType struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// ReferenceType represents the reference type metadata of an object-reference attribute.
+type ReferenceType struct {
+	WorkspaceID string `json:"workspaceId,omitempty"`
+	GlobalID    string `json:"globalId,omitempty"`
+	Name        string `json:"name"`
+}
+
 // NewUpdateAssetObjectRequest builds an UpdateAssetObjectRequest from simplified input.
 func NewUpdateAssetObjectRequest(input AssetObjectInput) *UpdateAssetObjectRequest {
 	req := &UpdateAssetObjectRequest{
