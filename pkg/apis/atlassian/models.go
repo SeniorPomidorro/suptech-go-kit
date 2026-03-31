@@ -9,12 +9,11 @@ type Issue struct {
 	Fields json.RawMessage `json:"fields,omitempty"`
 }
 
-// SearchResult is Jira search response.
+// SearchResult is Jira search response (POST /rest/api/3/search/jql).
 type SearchResult struct {
-	MaxResults    int     `json:"maxResults"`
-	Total         int     `json:"total"`
-	NextPageToken string  `json:"nextPageToken,omitempty"`
 	Issues        []Issue `json:"issues"`
+	NextPageToken string  `json:"nextPageToken,omitempty"`
+	IsLast        bool    `json:"isLast,omitempty"`
 }
 
 // Comment is a minimal Jira comment DTO.

@@ -113,21 +113,22 @@ func (s *IssuesService) FindIssues(ctx context.Context, jql string, opts *FindIs
 		pageSize = 100
 	}
 
-	nextPageToken := opts.NextPageToken
-	result := &SearchResult{
-		MaxResults: pageSize,
+	fields := opts.Fields
+	if len(fields) == 0 {
+		fields = []string{"*all"}
 	}
+
+	nextPageToken := opts.NextPageToken
+	result := &SearchResult{}
 
 	for {
 		payload := map[string]any{
 			"jql":        jql,
 			"maxResults": pageSize,
+			"fields":     fields,
 		}
 		if nextPageToken != "" {
 			payload["nextPageToken"] = nextPageToken
-		}
-		if len(opts.Fields) > 0 {
-			payload["fields"] = opts.Fields
 		}
 		if len(opts.Expand) > 0 {
 			payload["expand"] = strings.Join(opts.Expand, ",")
@@ -147,9 +148,8 @@ func (s *IssuesService) FindIssues(ctx context.Context, jql string, opts *FindIs
 			return &page, nil
 		}
 
-		result.Total = page.Total
 		result.Issues = append(result.Issues, page.Issues...)
-		if page.NextPageToken == "" || len(page.Issues) == 0 {
+		if page.IsLast || page.NextPageToken == "" || len(page.Issues) == 0 {
 			return result, nil
 		}
 		nextPageToken = page.NextPageToken

@@ -15,7 +15,7 @@ type OperationsService struct {
 }
 
 // CreateAlert creates a new operations alert.
-func (s *OperationsService) CreateAlert(ctx context.Context, payload map[string]any) (*Alert, error) {
+func (s *OperationsService) CreateAlert(ctx context.Context, payload map[string]any) (*CreateAlertResponse, error) {
 	if len(payload) == 0 {
 		return nil, errors.New("atlassian: alert payload is required")
 	}
@@ -30,11 +30,11 @@ func (s *OperationsService) CreateAlert(ctx context.Context, payload map[string]
 		return nil, err
 	}
 
-	var alert Alert
-	if err := s.client.transport.DoJSON(req, &alert); err != nil {
+	var resp CreateAlertResponse
+	if err := s.client.transport.DoJSON(req, &resp); err != nil {
 		return nil, err
 	}
-	return &alert, nil
+	return &resp, nil
 }
 
 // GetAlert returns alert by ID.
@@ -75,14 +75,17 @@ func (s *OperationsService) ListAlerts(ctx context.Context, opts *ListAlertsOpti
 	if strings.TrimSpace(opts.Query) != "" {
 		query.Set("query", opts.Query)
 	}
-	if opts.Limit > 0 {
-		query.Set("limit", strconv.Itoa(opts.Limit))
+	if opts.Size > 0 {
+		query.Set("size", strconv.Itoa(opts.Size))
 	}
 	if opts.Offset > 0 {
 		query.Set("offset", strconv.Itoa(opts.Offset))
 	}
 	if strings.TrimSpace(opts.Order) != "" {
 		query.Set("order", opts.Order)
+	}
+	if strings.TrimSpace(opts.Sort) != "" {
+		query.Set("sort", opts.Sort)
 	}
 
 	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
@@ -94,9 +97,6 @@ func (s *OperationsService) ListAlerts(ctx context.Context, opts *ListAlertsOpti
 	if err := s.client.transport.DoJSON(req, &result); err != nil {
 		return nil, err
 	}
-	if len(result.Values) == 0 {
-		result.Values = result.items()
-	}
 	return &result, nil
 }
 
@@ -106,7 +106,7 @@ func (s *OperationsService) EnableOpsForTeam(ctx context.Context, teamID string)
 		return errors.New("atlassian: team ID is required")
 	}
 
-	path, err := s.client.opsPath("/teams/" + url.PathEscape(teamID) + "/enable")
+	path, err := s.client.opsPath("/teams/" + url.PathEscape(teamID) + "/enable-ops")
 	if err != nil {
 		return err
 	}
@@ -119,22 +119,38 @@ func (s *OperationsService) EnableOpsForTeam(ctx context.Context, teamID string)
 }
 
 // ListTeams lists teams in Jira Operations.
-func (s *OperationsService) ListTeams(ctx context.Context, opts *ListTeamsOptions) (*TeamsListResult, error) {
+func (s *OperationsService) ListTeams(ctx context.Context) (*TeamsListResult, error) {
 	path, err := s.client.opsPath("/teams")
 	if err != nil {
 		return nil, err
 	}
 
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result TeamsListResult
+	if err := s.client.transport.DoJSON(req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ListNotificationRules lists operations notification rules.
+func (s *OperationsService) ListNotificationRules(ctx context.Context, opts *ListNotificationRulesOptions) (*NotificationRulesResult, error) {
+	path, err := s.client.opsPath("/notification-rules")
+	if err != nil {
+		return nil, err
+	}
+
 	if opts == nil {
-		opts = &ListTeamsOptions{}
+		opts = &ListNotificationRulesOptions{}
 	}
 
 	query := url.Values{}
-	if strings.TrimSpace(opts.Query) != "" {
-		query.Set("query", opts.Query)
-	}
-	if opts.Limit > 0 {
-		query.Set("limit", strconv.Itoa(opts.Limit))
+	if opts.Size > 0 {
+		query.Set("size", strconv.Itoa(opts.Size))
 	}
 	if opts.Offset > 0 {
 		query.Set("offset", strconv.Itoa(opts.Offset))
@@ -145,46 +161,11 @@ func (s *OperationsService) ListTeams(ctx context.Context, opts *ListTeamsOption
 		return nil, err
 	}
 
-	var result TeamsListResult
+	var result NotificationRulesResult
 	if err := s.client.transport.DoJSON(req, &result); err != nil {
 		return nil, err
 	}
-	if len(result.Values) == 0 {
-		result.Values = result.items()
-	}
 	return &result, nil
-}
-
-// GetUserNotificationSettings returns operations notification settings for user.
-func (s *OperationsService) GetUserNotificationSettings(ctx context.Context, userID string, opts *GetUserNotificationSettingsOptions) (*UserNotificationSettings, error) {
-	if strings.TrimSpace(userID) == "" {
-		return nil, errors.New("atlassian: user ID is required")
-	}
-
-	path, err := s.client.opsPath("/users/" + url.PathEscape(userID) + "/notification-settings")
-	if err != nil {
-		return nil, err
-	}
-
-	if opts == nil {
-		opts = &GetUserNotificationSettingsOptions{}
-	}
-
-	query := url.Values{}
-	if strings.TrimSpace(opts.TeamID) != "" {
-		query.Set("teamId", opts.TeamID)
-	}
-
-	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var settings UserNotificationSettings
-	if err := s.client.transport.DoJSON(req, &settings); err != nil {
-		return nil, err
-	}
-	return &settings, nil
 }
 
 // ListSchedules lists schedules.
@@ -199,11 +180,11 @@ func (s *OperationsService) ListSchedules(ctx context.Context, opts *ListSchedul
 	}
 
 	query := url.Values{}
-	if strings.TrimSpace(opts.TeamID) != "" {
-		query.Set("teamId", opts.TeamID)
+	if strings.TrimSpace(opts.Query) != "" {
+		query.Set("query", opts.Query)
 	}
-	if opts.Limit > 0 {
-		query.Set("limit", strconv.Itoa(opts.Limit))
+	if opts.Size > 0 {
+		query.Set("size", strconv.Itoa(opts.Size))
 	}
 	if opts.Offset > 0 {
 		query.Set("offset", strconv.Itoa(opts.Offset))
@@ -217,9 +198,6 @@ func (s *OperationsService) ListSchedules(ctx context.Context, opts *ListSchedul
 	var result SchedulesListResult
 	if err := s.client.transport.DoJSON(req, &result); err != nil {
 		return nil, err
-	}
-	if len(result.Values) == 0 {
-		result.Values = result.items()
 	}
 	return &result, nil
 }
@@ -247,30 +225,27 @@ func (s *OperationsService) GetSchedule(ctx context.Context, scheduleID string) 
 	return &schedule, nil
 }
 
-// ListOnCallResponders lists on-call responders for schedule.
-func (s *OperationsService) ListOnCallResponders(ctx context.Context, scheduleID string, opts *ListOnCallRespondersOptions) ([]OnCallResponder, error) {
+// ListOnCalls returns on-call participants for a schedule.
+func (s *OperationsService) ListOnCalls(ctx context.Context, scheduleID string, opts *ListOnCallOptions) (*OnCallResult, error) {
 	if strings.TrimSpace(scheduleID) == "" {
 		return nil, errors.New("atlassian: schedule ID is required")
 	}
 
-	path, err := s.client.opsPath("/schedules/" + url.PathEscape(scheduleID) + "/on-call/responders")
+	path, err := s.client.opsPath("/schedules/" + url.PathEscape(scheduleID) + "/on-calls")
 	if err != nil {
 		return nil, err
 	}
 
 	if opts == nil {
-		opts = &ListOnCallRespondersOptions{}
+		opts = &ListOnCallOptions{}
 	}
 
 	query := url.Values{}
-	if strings.TrimSpace(opts.From) != "" {
-		query.Set("from", opts.From)
+	if opts.Flat {
+		query.Set("flat", "true")
 	}
-	if strings.TrimSpace(opts.To) != "" {
-		query.Set("to", opts.To)
-	}
-	if opts.Limit > 0 {
-		query.Set("limit", strconv.Itoa(opts.Limit))
+	if strings.TrimSpace(opts.Date) != "" {
+		query.Set("date", opts.Date)
 	}
 
 	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
@@ -278,11 +253,11 @@ func (s *OperationsService) ListOnCallResponders(ctx context.Context, scheduleID
 		return nil, err
 	}
 
-	var result OnCallRespondersResult
+	var result OnCallResult
 	if err := s.client.transport.DoJSON(req, &result); err != nil {
 		return nil, err
 	}
-	return result.items(), nil
+	return &result, nil
 }
 
 func (c *Client) opsPath(pathSuffix string) (string, error) {
