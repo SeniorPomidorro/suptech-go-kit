@@ -10,25 +10,24 @@ type AssetsSearchOptions struct {
 
 // AssetsSearchResult is a paginated Assets AQL response.
 type AssetsSearchResult struct {
-	StartAt       int           `json:"startAt"`
-	MaxResults    int           `json:"maxResults"`
-	Total         int           `json:"total"`
-	IsLast        bool          `json:"isLast"`
-	Values        []AssetObject `json:"values,omitempty"`
-	ObjectEntries []AssetObject `json:"objectEntries,omitempty"`
+	StartAt              int                   `json:"startAt"`
+	MaxResults           int                   `json:"maxResults"`
+	Total                int                   `json:"total"`
+	IsLast               bool                  `json:"isLast"`
+	Values               []AssetObject         `json:"values,omitempty"`
+	ObjectTypeAttributes []ObjectTypeAttribute `json:"objectTypeAttributes,omitempty"`
 }
 
-// AssetObject is a minimal Jira Assets object DTO.
+// AssetObject is a Jira Assets object DTO.
 type AssetObject struct {
-	ID          string            `json:"id"`
-	ObjectKey   string            `json:"objectKey,omitempty"`
-	Label       string            `json:"label,omitempty"`
-	ObjectType  AssetObjectType   `json:"objectType,omitempty"`
-	Attributes  []AssetObjectAttr `json:"attributes,omitempty"`
-	Avatar      map[string]any    `json:"avatar,omitempty"`
-	Timestamps  map[string]any    `json:"timestamps,omitempty"`
-	RawMetadata map[string]any    `json:"metadata,omitempty"`
-	Raw         map[string]any    `json:"-"`
+	ID         string            `json:"id"`
+	ObjectKey  string            `json:"objectKey,omitempty"`
+	Label      string            `json:"label,omitempty"`
+	ObjectType AssetObjectType   `json:"objectType,omitempty"`
+	Attributes []AssetObjectAttr `json:"attributes,omitempty"`
+	Avatar     map[string]any    `json:"avatar,omitempty"`
+	Created    string            `json:"created,omitempty"`
+	Updated    string            `json:"updated,omitempty"`
 }
 
 // AssetObjectType is a minimal object type descriptor.
@@ -45,10 +44,6 @@ type AssetObjectAttr struct {
 	ObjectTypeAttributeID string                  `json:"objectTypeAttributeId,omitempty"`
 	ObjectAttributeValues []AssetAttributeValue   `json:"objectAttributeValues,omitempty"`
 	ObjectID              string                  `json:"objectId,omitempty"`
-	Meta                  map[string]any          `json:"meta,omitempty"`
-	Value                 map[string]any          `json:"value,omitempty"`
-	Values                []map[string]any        `json:"values,omitempty"`
-	Additional            map[string][]string     `json:"additional,omitempty"`
 }
 
 // AssetAttributeValue represents a single value within an object attribute.
@@ -122,19 +117,11 @@ type ObjectSchemaList struct {
 	Values []ObjectSchema `json:"values"`
 }
 
-func (r AssetsSearchResult) objects() []AssetObject {
-	if len(r.Values) > 0 {
-		return r.Values
-	}
-	return r.ObjectEntries
-}
-
 // FindObjectByID returns an object by its ID.
 func (r *AssetsSearchResult) FindObjectByID(id string) *AssetObject {
-	objects := r.objects()
-	for i := range objects {
-		if objects[i].ID == id {
-			return &objects[i]
+	for i := range r.Values {
+		if r.Values[i].ID == id {
+			return &r.Values[i]
 		}
 	}
 	return nil
@@ -142,10 +129,9 @@ func (r *AssetsSearchResult) FindObjectByID(id string) *AssetObject {
 
 // FindObjectByKey returns an object by its ObjectKey.
 func (r *AssetsSearchResult) FindObjectByKey(key string) *AssetObject {
-	objects := r.objects()
-	for i := range objects {
-		if objects[i].ObjectKey == key {
-			return &objects[i]
+	for i := range r.Values {
+		if r.Values[i].ObjectKey == key {
+			return &r.Values[i]
 		}
 	}
 	return nil
@@ -153,10 +139,9 @@ func (r *AssetsSearchResult) FindObjectByKey(key string) *AssetObject {
 
 // FindObjectByLabel returns an object by its Label.
 func (r *AssetsSearchResult) FindObjectByLabel(label string) *AssetObject {
-	objects := r.objects()
-	for i := range objects {
-		if objects[i].Label == label {
-			return &objects[i]
+	for i := range r.Values {
+		if r.Values[i].Label == label {
+			return &r.Values[i]
 		}
 	}
 	return nil
@@ -179,6 +164,28 @@ func (o *AssetObject) GetAttributeValues(attributeID string) []AssetAttributeVal
 		return nil
 	}
 	return attr.ObjectAttributeValues
+}
+
+// GetAttributeValue returns the first Value string of an attribute.
+// Returns empty string if the attribute is missing or has no values.
+// Note: user/group/reference attributes do not populate Value;
+// use GetAttributeDisplayValue for those types.
+func (o *AssetObject) GetAttributeValue(attributeID string) string {
+	values := o.GetAttributeValues(attributeID)
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0].Value
+}
+
+// GetAttributeDisplayValue returns the first DisplayValue string of an attribute.
+// Returns empty string if the attribute is missing or has no values.
+func (o *AssetObject) GetAttributeDisplayValue(attributeID string) string {
+	values := o.GetAttributeValues(attributeID)
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0].DisplayValue
 }
 
 // CreateAssetObjectRequest represents the payload for creating an asset object.

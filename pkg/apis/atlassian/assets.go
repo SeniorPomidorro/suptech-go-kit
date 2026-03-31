@@ -67,20 +67,16 @@ func (s *AssetsService) SearchObjectsAQL(ctx context.Context, aql string, opts *
 		if err := s.client.transport.DoJSON(req, &page); err != nil {
 			return nil, err
 		}
-		objects := page.objects()
 
 		if !opts.FetchAll {
-			if len(page.Values) == 0 {
-				page.Values = objects
-			}
 			return &page, nil
 		}
 
-		result.Values = append(result.Values, objects...)
+		result.Values = append(result.Values, page.Values...)
 		result.Total = page.Total
 		result.IsLast = page.IsLast
-		startAt += len(objects)
-		if page.IsLast || len(objects) == 0 || (page.Total > 0 && startAt >= page.Total) {
+		startAt += len(page.Values)
+		if page.IsLast || len(page.Values) == 0 || (page.Total > 0 && startAt >= page.Total) {
 			return result, nil
 		}
 	}

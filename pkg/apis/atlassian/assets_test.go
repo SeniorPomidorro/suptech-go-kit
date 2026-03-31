@@ -195,18 +195,6 @@ func TestAssetsSearchResultFindMethods(t *testing.T) {
 		}
 	})
 
-	t.Run("ObjectEntries fallback", func(t *testing.T) {
-		resultWithEntries := &AssetsSearchResult{
-			ObjectEntries: []AssetObject{
-				{ID: "10", ObjectKey: "KEY-10", Label: "Entry 1"},
-			},
-		}
-
-		obj := resultWithEntries.FindObjectByID("10")
-		if obj == nil || obj.ID != "10" {
-			t.Error("expected to find object in ObjectEntries")
-		}
-	})
 }
 
 func TestAssetObjectAttributeMethods(t *testing.T) {
@@ -226,12 +214,12 @@ func TestAssetObjectAttributeMethods(t *testing.T) {
 				ObjectTypeAttributeID: "454",
 				ObjectAttributeValues: []AssetAttributeValue{
 					{
-						DisplayValue: "Sergey Rostovskiy",
-						SearchValue:  "61f983b2845d670071f2c97d",
+						DisplayValue: "John Doe",
+						SearchValue:  "abc123def456",
 						User: &AssetAttributeUser{
-							DisplayName:  "Sergey Rostovskiy",
-							EmailAddress: "sergey.rostovskiy@tabby.ai",
-							Key:          "61f983b2845d670071f2c97d",
+							DisplayName:  "John Doe",
+							EmailAddress: "john.doe@example.com",
+							Key:          "abc123def456",
 						},
 					},
 				},
@@ -287,8 +275,38 @@ func TestAssetObjectAttributeMethods(t *testing.T) {
 		if values[0].User == nil {
 			t.Fatal("expected user to be present")
 		}
-		if values[0].User.EmailAddress != "sergey.rostovskiy@tabby.ai" {
+		if values[0].User.EmailAddress != "john.doe@example.com" {
 			t.Errorf("unexpected email: %s", values[0].User.EmailAddress)
+		}
+	})
+
+	t.Run("GetAttributeValue", func(t *testing.T) {
+		if got := obj.GetAttributeValue("402"); got != "ServiceDesk Team" {
+			t.Errorf("expected %q, got %q", "ServiceDesk Team", got)
+		}
+		if got := obj.GetAttributeValue("449"); got != "v1" {
+			t.Errorf("expected first value %q, got %q", "v1", got)
+		}
+		if got := obj.GetAttributeValue("454"); got != "" {
+			t.Errorf("expected empty string for user attribute, got %q", got)
+		}
+		if got := obj.GetAttributeValue("999"); got != "" {
+			t.Errorf("expected empty string for missing attribute, got %q", got)
+		}
+	})
+
+	t.Run("GetAttributeDisplayValue", func(t *testing.T) {
+		if got := obj.GetAttributeDisplayValue("402"); got != "ServiceDesk Team" {
+			t.Errorf("expected %q, got %q", "ServiceDesk Team", got)
+		}
+		if got := obj.GetAttributeDisplayValue("454"); got != "John Doe" {
+			t.Errorf("expected %q, got %q", "John Doe", got)
+		}
+		if got := obj.GetAttributeDisplayValue("449"); got != "Value 1" {
+			t.Errorf("expected first display value %q, got %q", "Value 1", got)
+		}
+		if got := obj.GetAttributeDisplayValue("999"); got != "" {
+			t.Errorf("expected empty string for missing attribute, got %q", got)
 		}
 	})
 }
