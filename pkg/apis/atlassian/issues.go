@@ -18,11 +18,11 @@ type IssuesService struct {
 
 // FindIssuesOptions controls JQL search.
 type FindIssuesOptions struct {
-	Fields   []string
-	Expand   []string
-	PageSize int
-	StartAt  int
-	FetchAll bool
+	Fields        []string
+	Expand        []string
+	PageSize      int
+	NextPageToken string
+	FetchAll      bool
 }
 
 // CommentOption mutates comment creation payload.
@@ -113,23 +113,24 @@ func (s *IssuesService) FindIssues(ctx context.Context, jql string, opts *FindIs
 		pageSize = 100
 	}
 
-	startAt := opts.StartAt
+	nextPageToken := opts.NextPageToken
 	result := &SearchResult{
-		StartAt:    opts.StartAt,
 		MaxResults: pageSize,
 	}
 
 	for {
 		payload := map[string]any{
 			"jql":        jql,
-			"startAt":    startAt,
 			"maxResults": pageSize,
+		}
+		if nextPageToken != "" {
+			payload["nextPageToken"] = nextPageToken
 		}
 		if len(opts.Fields) > 0 {
 			payload["fields"] = opts.Fields
 		}
 		if len(opts.Expand) > 0 {
-			payload["expand"] = opts.Expand
+			payload["expand"] = strings.Join(opts.Expand, ",")
 		}
 
 		req, err := s.client.newRequest(ctx, http.MethodPost, "/rest/api/3/search/jql", nil, payload)
@@ -148,10 +149,10 @@ func (s *IssuesService) FindIssues(ctx context.Context, jql string, opts *FindIs
 
 		result.Total = page.Total
 		result.Issues = append(result.Issues, page.Issues...)
-		startAt += len(page.Issues)
-		if startAt >= page.Total || len(page.Issues) == 0 {
+		if page.NextPageToken == "" || len(page.Issues) == 0 {
 			return result, nil
 		}
+		nextPageToken = page.NextPageToken
 	}
 }
 

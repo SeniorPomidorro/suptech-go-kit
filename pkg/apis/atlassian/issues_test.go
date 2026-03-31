@@ -13,24 +13,33 @@ import (
 func TestFindIssuesFetchAll(t *testing.T) {
 	t.Parallel()
 
+	requestCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
 		if r.URL.Path != "/rest/api/3/search/jql" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 
 		var payload struct {
-			StartAt int `json:"startAt"`
+			NextPageToken string `json:"nextPageToken"`
+			MaxResults    int    `json:"maxResults"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
+		if payload.MaxResults != 2 {
+			t.Fatalf("unexpected maxResults: %d", payload.MaxResults)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if payload.StartAt == 0 {
-			_, _ = w.Write([]byte(`{"startAt":0,"maxResults":2,"total":3,"issues":[{"id":"1","key":"ABC-1"},{"id":"2","key":"ABC-2"}]}`))
+		if payload.NextPageToken == "" {
+			_, _ = w.Write([]byte(`{"maxResults":2,"total":3,"nextPageToken":"page2token","issues":[{"id":"1","key":"ABC-1"},{"id":"2","key":"ABC-2"}]}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{"startAt":2,"maxResults":2,"total":3,"issues":[{"id":"3","key":"ABC-3"}]}`))
+		if payload.NextPageToken != "page2token" {
+			t.Fatalf("unexpected nextPageToken: %q", payload.NextPageToken)
+		}
+		_, _ = w.Write([]byte(`{"maxResults":2,"total":3,"issues":[{"id":"3","key":"ABC-3"}]}`))
 	}))
 	defer srv.Close()
 
@@ -52,6 +61,9 @@ func TestFindIssuesFetchAll(t *testing.T) {
 	}
 	if result.Total != 3 {
 		t.Fatalf("expected total=3, got %d", result.Total)
+	}
+	if requestCount != 2 {
+		t.Fatalf("expected 2 paginated requests, got %d", requestCount)
 	}
 }
 

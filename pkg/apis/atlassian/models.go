@@ -11,10 +11,10 @@ type Issue struct {
 
 // SearchResult is Jira search response.
 type SearchResult struct {
-	StartAt    int     `json:"startAt"`
-	MaxResults int     `json:"maxResults"`
-	Total      int     `json:"total"`
-	Issues     []Issue `json:"issues"`
+	MaxResults    int     `json:"maxResults"`
+	Total         int     `json:"total"`
+	NextPageToken string  `json:"nextPageToken,omitempty"`
+	Issues        []Issue `json:"issues"`
 }
 
 // Comment is a minimal Jira comment DTO.
