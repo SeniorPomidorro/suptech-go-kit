@@ -167,7 +167,7 @@ _ = raw
 - Assets: `SearchObjectsAQL` (`FetchAll`), `CreateObject`, `DeleteObject`, `UpdateObject`, `GetObject`
   - Structured request types: `CreateAssetObjectRequest`, `UpdateAssetObjectRequest`
   - Simplified factory functions: `NewCreateAssetObjectRequest`, `NewUpdateAssetObjectRequest`
-- Operations: `CreateAlert`, `GetAlert`, `ListAlerts`, `EnableOpsForTeam`, `ListTeams`, `GetUserNotificationSettings`, `ListSchedules`, `GetSchedule`, `ListOnCallResponders`
+- Operations: `CreateAlert`, `GetAlert`, `ListAlerts`, `EnableOpsForTeam`, `ListTeams`, `ListNotificationRules`, `ListSchedules`, `GetSchedule`, `ListOnCalls`
 
 ### `pkg/apis/slack`
 
