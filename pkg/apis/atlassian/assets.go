@@ -47,19 +47,18 @@ func (s *AssetsService) SearchObjectsAQL(ctx context.Context, aql string, opts *
 	}
 
 	for {
-		payload := map[string]any{
-			"qlQuery":    aql,
-			"startAt":    startAt,
-			"maxResults": pageSize,
-		}
+		query := url.Values{}
+		query.Set("startAt", fmt.Sprintf("%d", startAt))
+		query.Set("maxResults", fmt.Sprintf("%d", pageSize))
 		if opts.IncludeAttributes {
-			payload["includeAttributes"] = true
-		}
-		if opts.IncludeTypeAttributes {
-			payload["includeTypeAttributes"] = true
+			query.Set("includeAttributes", "true")
 		}
 
-		req, err := s.client.newCloudRequest(ctx, http.MethodPost, path, nil, payload)
+		payload := map[string]any{
+			"qlQuery": aql,
+		}
+
+		req, err := s.client.newCloudRequest(ctx, http.MethodPost, path, query, payload)
 		if err != nil {
 			return nil, err
 		}

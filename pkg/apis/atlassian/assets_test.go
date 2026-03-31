@@ -54,9 +54,9 @@ func TestSearchObjectsAQLFetchAll(t *testing.T) {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 
+		// qlQuery must be in the request body
 		var payload struct {
-			StartAt int    `json:"startAt"`
-			Query   string `json:"qlQuery"`
+			Query string `json:"qlQuery"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode payload: %v", err)
@@ -65,8 +65,15 @@ func TestSearchObjectsAQLFetchAll(t *testing.T) {
 			t.Fatalf("unexpected query: %q", payload.Query)
 		}
 
+		// startAt and maxResults must be query parameters
+		startAt := r.URL.Query().Get("startAt")
+		maxResults := r.URL.Query().Get("maxResults")
+		if maxResults != "2" {
+			t.Fatalf("unexpected maxResults query param: %q", maxResults)
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		if payload.StartAt == 0 {
+		if startAt == "0" {
 			_, _ = w.Write([]byte(`{"startAt":0,"maxResults":2,"total":3,"isLast":false,"values":[{"id":"1"},{"id":"2"}]}`))
 			return
 		}

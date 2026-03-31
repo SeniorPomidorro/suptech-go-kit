@@ -2,11 +2,10 @@ package atlassian
 
 // AssetsSearchOptions controls AQL pagination and response shape.
 type AssetsSearchOptions struct {
-	StartAt               int
-	PageSize              int
-	FetchAll              bool
-	IncludeAttributes     bool
-	IncludeTypeAttributes bool
+	StartAt           int
+	PageSize          int
+	FetchAll          bool
+	IncludeAttributes bool
 }
 
 // AssetsSearchResult is a paginated Assets AQL response.
