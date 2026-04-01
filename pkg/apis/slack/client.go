@@ -160,6 +160,25 @@ func (c *Client) newJSONRequest(ctx context.Context, method string, payload any)
 	return c.newRawRequest(ctx, method, bytes.NewReader(data), "application/json")
 }
 
+func (c *Client) newGetRequest(ctx context.Context, method string, params url.Values) (*http.Request, error) {
+	endpoint, err := resolveSlackMethodURL(c.baseURL, method)
+	if err != nil {
+		return nil, err
+	}
+	if params != nil {
+		endpoint.RawQuery = params.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("slack: create request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	return req, nil
+}
+
 func (c *Client) newRawRequest(ctx context.Context, method string, body io.Reader, contentType string) (*http.Request, error) {
 	endpoint, err := resolveSlackMethodURL(c.baseURL, method)
 	if err != nil {

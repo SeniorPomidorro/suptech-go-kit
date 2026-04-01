@@ -39,17 +39,21 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, title, text string) (*
 }
 
 // ShareCanvas shares canvas access with a channel.
-func (s *CanvasService) ShareCanvas(ctx context.Context, canvasID, channelID string) error {
+func (s *CanvasService) ShareCanvas(ctx context.Context, canvasID, channelID, accessLevel string) error {
 	if strings.TrimSpace(canvasID) == "" {
 		return errors.New("slack: canvas ID is required")
 	}
 	if strings.TrimSpace(channelID) == "" {
 		return errors.New("slack: channel ID is required")
 	}
+	if strings.TrimSpace(accessLevel) == "" {
+		return errors.New("slack: access level is required")
+	}
 
 	payload := map[string]any{
-		"canvas_id":   canvasID,
-		"channel_ids": []string{channelID},
+		"canvas_id":    canvasID,
+		"access_level": accessLevel,
+		"channel_ids":  []string{channelID},
 	}
 	httpReq, err := s.client.newJSONRequest(ctx, "canvases.access.set", payload)
 	if err != nil {

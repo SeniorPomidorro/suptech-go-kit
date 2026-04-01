@@ -19,11 +19,11 @@ func TestListUserGroupsAddsTeamID(t *testing.T) {
 		if r.URL.Path != "/usergroups.list" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parse form: %v", err)
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
 		}
-		if r.Form.Get("team_id") != "T999" {
-			t.Fatalf("expected team_id=T999, got %q", r.Form.Get("team_id"))
+		if r.URL.Query().Get("team_id") != "T999" {
+			t.Fatalf("expected team_id=T999, got %q", r.URL.Query().Get("team_id"))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true,"usergroups":[{"id":"S1","name":"Ops"}]}`))
@@ -95,26 +95,20 @@ func TestGetUsersByGroupIDResolvesUsers(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/usergroups.users.list":
-			if err := r.ParseForm(); err != nil {
-				t.Fatalf("parse form: %v", err)
-			}
-			if r.Form.Get("usergroup") != "S111" {
-				t.Fatalf("unexpected usergroup: %q", r.Form.Get("usergroup"))
+			if r.URL.Query().Get("usergroup") != "S111" {
+				t.Fatalf("unexpected usergroup: %q", r.URL.Query().Get("usergroup"))
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"ok":true,"users":["U1","U2"]}`))
 		case "/users.info":
-			if err := r.ParseForm(); err != nil {
-				t.Fatalf("parse form: %v", err)
-			}
 			usersInfoCalls++
-			switch r.Form.Get("user") {
+			switch r.URL.Query().Get("user") {
 			case "U1":
 				_, _ = w.Write([]byte(`{"ok":true,"user":{"id":"U1","name":"alice"}}`))
 			case "U2":
 				_, _ = w.Write([]byte(`{"ok":true,"user":{"id":"U2","name":"bob"}}`))
 			default:
-				t.Fatalf("unexpected users.info user: %q", r.Form.Get("user"))
+				t.Fatalf("unexpected users.info user: %q", r.URL.Query().Get("user"))
 			}
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)

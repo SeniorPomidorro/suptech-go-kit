@@ -183,7 +183,7 @@ func TestCreateAndShareCanvas(t *testing.T) {
 		t.Fatalf("unexpected canvas id: %q", canvas.ID)
 	}
 
-	if err := client.Canvas().ShareCanvas(context.Background(), "CANVAS1", "C123"); err != nil {
+	if err := client.Canvas().ShareCanvas(context.Background(), "CANVAS1", "C123", "write"); err != nil {
 		t.Fatalf("ShareCanvas failed: %v", err)
 	}
 
@@ -231,10 +231,10 @@ func TestShareCanvasValidation(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	if err := client.Canvas().ShareCanvas(context.Background(), "", "C123"); err == nil {
+	if err := client.Canvas().ShareCanvas(context.Background(), "", "C123", "write"); err == nil {
 		t.Fatalf("expected error for empty canvas ID")
 	}
-	if err := client.Canvas().ShareCanvas(context.Background(), "CANVAS", ""); err == nil {
+	if err := client.Canvas().ShareCanvas(context.Background(), "CANVAS", "", "write"); err == nil {
 		t.Fatalf("expected error for empty channel ID")
 	}
 }

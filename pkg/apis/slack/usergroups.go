@@ -42,10 +42,10 @@ func (s *UserGroupsService) CreateUserGroup(ctx context.Context, name, tag strin
 
 // ListUserGroups lists user groups.
 func (s *UserGroupsService) ListUserGroups(ctx context.Context) ([]UserGroup, error) {
-	form := url.Values{}
-	s.client.withTeamID(form)
+	params := url.Values{}
+	s.client.withTeamID(params)
 
-	req, err := s.client.newFormRequest(ctx, "usergroups.list", form)
+	req, err := s.client.newGetRequest(ctx, "usergroups.list", params)
 	if err != nil {
 		return nil, err
 	}
