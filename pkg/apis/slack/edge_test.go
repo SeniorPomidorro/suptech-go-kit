@@ -202,7 +202,7 @@ func TestPostMessageUsesJSONPayload(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	result, err := client.Messages().PostMessage(context.Background(), "C1", "hello")
+	result, err := client.Messages().PostMessage(context.Background(), &PostMessageRequest{Channel: "C1", Text: "hello"})
 	if err != nil {
 		t.Fatalf("PostMessage failed: %v", err)
 	}

@@ -121,7 +121,10 @@ if err != nil {
 	panic(err)
 }
 
-msg, err := sl.Messages().PostMessage(ctx, "C123", "hello")
+msg, err := sl.Messages().PostMessage(ctx, &slack.PostMessageRequest{
+	Channel: "C123",
+	Text:    "hello",
+})
 if err != nil {
 	panic(err)
 }
