@@ -24,6 +24,7 @@ type SocketModeEvent struct {
 	Payload                json.RawMessage `json:"payload,omitempty"`
 	RetryAttempt           int             `json:"retry_attempt,omitempty"`
 	RetryReason            string          `json:"retry_reason,omitempty"`
+	Reason                 string          `json:"reason,omitempty"`
 }
 
 // SocketModeResponse contains optional payload sent in envelope ACK.
@@ -244,6 +245,14 @@ func (c *SocketModeClient) processConnection(ctx context.Context, conn SocketMod
 		var event SocketModeEvent
 		if err := conn.ReadJSON(&event); err != nil {
 			return err
+		}
+
+		// Handle disconnect: Slack asks us to reconnect.
+		if event.Type == "disconnect" {
+			if c.logger != nil {
+				c.logger.Printf("slack socket mode: disconnect received: reason=%s", event.Reason)
+			}
+			return nil // returning nil triggers reconnect in RunWithHandler loop
 		}
 
 		var response *SocketModeResponse

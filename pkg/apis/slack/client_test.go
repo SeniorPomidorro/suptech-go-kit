@@ -36,7 +36,7 @@ func TestPostMessageReturnsSlackErrorOnOKFalse(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	_, err = client.Messages().PostMessage(context.Background(), "C123", "hello")
+	_, err = client.Messages().PostMessage(context.Background(), &PostMessageRequest{Channel: "C123", Text: "hello"})
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -176,7 +176,7 @@ func TestSlackClientRespectsBasePath(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	_, err = client.Messages().PostMessage(context.Background(), "C123", "hello")
+	_, err = client.Messages().PostMessage(context.Background(), &PostMessageRequest{Channel: "C123", Text: "hello"})
 	if err != nil {
 		t.Fatalf("PostMessage failed: %v", err)
 	}

@@ -62,6 +62,40 @@ type EphemeralPostResult struct {
 	MessageTS string `json:"message_ts,omitempty"`
 }
 
+// PostMessageRequest is the payload for chat.postMessage.
+// Blocks and Attachments accept any JSON-serializable structs
+// (e.g. slack-go block types, maps, or custom structs).
+type PostMessageRequest struct {
+	Channel     string         `json:"channel"`
+	Text        string         `json:"text,omitempty"`
+	Blocks      []any          `json:"blocks,omitempty"`
+	Attachments []any          `json:"attachments,omitempty"`
+	ThreadTS    string         `json:"thread_ts,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	UnfurlLinks *bool          `json:"unfurl_links,omitempty"`
+	UnfurlMedia *bool          `json:"unfurl_media,omitempty"`
+}
+
+// PostEphemeralRequest is the payload for chat.postEphemeral.
+type PostEphemeralRequest struct {
+	Channel     string `json:"channel"`
+	User        string `json:"user"`
+	Text        string `json:"text,omitempty"`
+	Blocks      []any  `json:"blocks,omitempty"`
+	Attachments []any  `json:"attachments,omitempty"`
+	ThreadTS    string `json:"thread_ts,omitempty"`
+}
+
+// UpdateMessageRequest is the payload for chat.update.
+type UpdateMessageRequest struct {
+	Channel     string         `json:"channel"`
+	TS          string         `json:"ts"`
+	Text        string         `json:"text,omitempty"`
+	Blocks      []any          `json:"blocks,omitempty"`
+	Attachments []any          `json:"attachments,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+}
+
 // ViewText represents Slack plain_text/markdown text object.
 type ViewText struct {
 	Type  string `json:"type"`

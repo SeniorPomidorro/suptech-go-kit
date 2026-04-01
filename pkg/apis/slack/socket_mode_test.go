@@ -209,6 +209,59 @@ func TestSocketModeRunReconnectsAfterDialError(t *testing.T) {
 	}
 }
 
+func TestSocketModeDisconnectTriggersReconnect(t *testing.T) {
+	t.Parallel()
+
+	openCalls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		openCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"url":"ws://socket.example/conn"}`))
+	}))
+	defer srv.Close()
+
+	// First connection receives disconnect, second receives a normal event.
+	conn1 := &fakeSocketModeConn{
+		readMessages: []string{
+			`{"type":"disconnect","reason":"refresh_requested"}`,
+		},
+	}
+	conn2 := &fakeSocketModeConn{
+		readMessages: []string{
+			`{"type":"events_api","envelope_id":"env-after","payload":{}}`,
+		},
+	}
+	dialer := &fakeSocketModeDialer{
+		conns: []SocketModeConn{conn1, conn2},
+	}
+
+	client := NewSocketModeClient(
+		WithAppLevelToken("xapp-test"),
+		WithSocketModeBaseURL(srv.URL),
+		WithSocketModeTransport(transport.New()),
+		WithSocketModeDialer(dialer),
+		WithSocketModeReconnectDelay(0),
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	err := client.RunWithHandler(ctx, SocketModeHandlerFunc(func(ctx context.Context, event SocketModeEvent) (*SocketModeResponse, error) {
+		cancel()
+		return nil, nil
+	}))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	// Should have called apps.connections.open twice (once per connection).
+	if openCalls != 2 {
+		t.Fatalf("expected 2 apps.connections.open calls, got %d", openCalls)
+	}
+	// First connection should have no writes (disconnect has no envelope_id).
+	if len(conn1.writesSnapshot()) != 0 {
+		t.Fatalf("expected no writes on disconnected conn, got %d", len(conn1.writesSnapshot()))
+	}
+}
+
 func TestSocketModeRunValidationErrors(t *testing.T) {
 	t.Parallel()
 
