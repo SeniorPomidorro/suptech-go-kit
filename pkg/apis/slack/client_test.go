@@ -57,35 +57,33 @@ func TestGetConversationListUsesCursorPagination(t *testing.T) {
 		if r.URL.Path != "/conversations.list" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		if r.Method != http.MethodPost {
+		if r.Method != http.MethodGet {
 			t.Fatalf("unexpected method: %s", r.Method)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer xoxb-test" {
 			t.Fatalf("unexpected authorization header: %q", got)
 		}
 
-		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parse form: %v", err)
+		q := r.URL.Query()
+		if q.Get("types") != "public_channel,private_channel" {
+			t.Fatalf("unexpected types value: %q", q.Get("types"))
 		}
-		if r.Form.Get("types") != "public_channel,private_channel" {
-			t.Fatalf("unexpected types value: %q", r.Form.Get("types"))
-		}
-		if r.Form.Get("team_id") != "T123" {
-			t.Fatalf("unexpected team_id: %q", r.Form.Get("team_id"))
+		if q.Get("team_id") != "T123" {
+			t.Fatalf("unexpected team_id: %q", q.Get("team_id"))
 		}
 
 		requestCount++
 		w.Header().Set("Content-Type", "application/json")
 		if requestCount == 1 {
-			if r.Form.Get("cursor") != "" {
-				t.Fatalf("expected first request without cursor, got %q", r.Form.Get("cursor"))
+			if q.Get("cursor") != "" {
+				t.Fatalf("expected first request without cursor, got %q", q.Get("cursor"))
 			}
 			_, _ = w.Write([]byte(`{"ok":true,"channels":[{"id":"C1"},{"id":"C2"}],"response_metadata":{"next_cursor":"cursor-1"}}`))
 			return
 		}
 
-		if r.Form.Get("cursor") != "cursor-1" {
-			t.Fatalf("expected second request cursor cursor-1, got %q", r.Form.Get("cursor"))
+		if q.Get("cursor") != "cursor-1" {
+			t.Fatalf("expected second request cursor cursor-1, got %q", q.Get("cursor"))
 		}
 		_, _ = w.Write([]byte(`{"ok":true,"channels":[{"id":"C3"}],"response_metadata":{"next_cursor":""}}`))
 	}))

@@ -18,11 +18,10 @@ func (s *UsersService) GetUserByID(ctx context.Context, userID string) (*User, e
 		return nil, errors.New("slack: user ID is required")
 	}
 
-	form := url.Values{}
-	form.Set("user", userID)
-	s.client.withTeamID(form)
+	params := url.Values{}
+	params.Set("user", userID)
 
-	req, err := s.client.newFormRequest(ctx, "users.info", form)
+	req, err := s.client.newGetRequest(ctx, "users.info", params)
 	if err != nil {
 		return nil, err
 	}
@@ -59,11 +58,11 @@ func (s *UsersService) GetUsersByGroupID(ctx context.Context, userGroupID string
 		return nil, errors.New("slack: user group ID is required")
 	}
 
-	form := url.Values{}
-	form.Set("usergroup", userGroupID)
-	s.client.withTeamID(form)
+	params := url.Values{}
+	params.Set("usergroup", userGroupID)
+	s.client.withTeamID(params)
 
-	req, err := s.client.newFormRequest(ctx, "usergroups.users.list", form)
+	req, err := s.client.newGetRequest(ctx, "usergroups.users.list", params)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +85,10 @@ func (s *UsersService) GetUserByEmail(ctx context.Context, email string) (*User,
 		return nil, errors.New("slack: email is required")
 	}
 
-	form := url.Values{}
-	form.Set("email", email)
-	s.client.withTeamID(form)
+	params := url.Values{}
+	params.Set("email", email)
 
-	req, err := s.client.newFormRequest(ctx, "users.lookupByEmail", form)
+	req, err := s.client.newGetRequest(ctx, "users.lookupByEmail", params)
 	if err != nil {
 		return nil, err
 	}

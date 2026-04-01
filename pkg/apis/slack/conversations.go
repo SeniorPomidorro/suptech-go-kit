@@ -20,19 +20,19 @@ func (s *ConversationsService) GetConversationList(ctx context.Context, excludeA
 	)
 
 	for {
-		form := url.Values{}
+		params := url.Values{}
 		if excludeArchived {
-			form.Set("exclude_archived", "true")
+			params.Set("exclude_archived", "true")
 		}
 		if len(channelTypes) > 0 {
-			form.Set("types", strings.Join(channelTypes, ","))
+			params.Set("types", strings.Join(channelTypes, ","))
 		}
 		if cursor != "" {
-			form.Set("cursor", cursor)
+			params.Set("cursor", cursor)
 		}
-		s.client.withTeamID(form)
+		s.client.withTeamID(params)
 
-		req, err := s.client.newFormRequest(ctx, "conversations.list", form)
+		req, err := s.client.newGetRequest(ctx, "conversations.list", params)
 		if err != nil {
 			return nil, err
 		}
@@ -86,11 +86,10 @@ func (s *ConversationsService) GetChannelByID(ctx context.Context, channelID str
 		return nil, errors.New("slack: channel ID is required")
 	}
 
-	form := url.Values{}
-	form.Set("channel", channelID)
-	s.client.withTeamID(form)
+	params := url.Values{}
+	params.Set("channel", channelID)
 
-	req, err := s.client.newFormRequest(ctx, "conversations.info", form)
+	req, err := s.client.newGetRequest(ctx, "conversations.info", params)
 	if err != nil {
 		return nil, err
 	}
