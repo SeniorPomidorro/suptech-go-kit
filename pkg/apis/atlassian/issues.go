@@ -156,6 +156,53 @@ func (s *IssuesService) FindIssues(ctx context.Context, jql string, opts *FindIs
 	}
 }
 
+// UpdateIssue edits a Jira issue fields and/or applies update operations.
+func (s *IssuesService) UpdateIssue(ctx context.Context, ticketKey string, body *UpdateIssueRequest, opts *UpdateIssueOptions) (*Issue, error) {
+	if strings.TrimSpace(ticketKey) == "" {
+		return nil, errors.New("atlassian: ticket key is required")
+	}
+	if body == nil {
+		return nil, errors.New("atlassian: update request body is required")
+	}
+
+	path := fmt.Sprintf("/rest/api/3/issue/%s", url.PathEscape(ticketKey))
+
+	var query url.Values
+	if opts != nil {
+		query = url.Values{}
+		if opts.NotifyUsers != nil && !*opts.NotifyUsers {
+			query.Set("notifyUsers", "false")
+		}
+		if opts.OverrideScreenSecurity {
+			query.Set("overrideScreenSecurity", "true")
+		}
+		if opts.OverrideEditableFlag {
+			query.Set("overrideEditableFlag", "true")
+		}
+		if opts.ReturnIssue {
+			query.Set("returnIssue", "true")
+		}
+		if opts.Expand != "" {
+			query.Set("expand", opts.Expand)
+		}
+	}
+
+	req, err := s.client.newRequest(ctx, http.MethodPut, path, query, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts != nil && opts.ReturnIssue {
+		var issue Issue
+		if err := s.client.transport.DoJSON(req, &issue); err != nil {
+			return nil, err
+		}
+		return &issue, nil
+	}
+
+	return nil, s.client.doNoResponseBody(req)
+}
+
 // ManageTags updates Jira labels via add/remove or full replace.
 func (s *IssuesService) ManageTags(ctx context.Context, ticketKey string, add, remove, replace []string) error {
 	if strings.TrimSpace(ticketKey) == "" {

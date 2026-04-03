@@ -165,7 +165,8 @@ _ = raw
 
 ### `pkg/apis/atlassian`
 
-- Issues: `GetIssue`, `SaveStoryPoints`, `FindIssues` (`FetchAll`), `ManageTags`, `CreateComment`, `AddAttachment`
+- Issues: `GetIssue`, `UpdateIssue`, `SaveStoryPoints`, `FindIssues` (`FetchAll`), `ManageTags`, `CreateComment`, `AddAttachment`
+- ADF helpers: `TextToADF`, `ADFToText`
 - Users: `FindUsers`
 - Assets: `SearchObjectsAQL` (`FetchAll`), `CreateObject`, `DeleteObject`, `UpdateObject`, `GetObject`
   - Structured request types: `CreateAssetObjectRequest`, `UpdateAssetObjectRequest`
@@ -175,7 +176,7 @@ _ = raw
 ### `pkg/apis/slack`
 
 - User groups: `CreateUserGroup`, `ListUserGroups`
-- Conversations: `GetConversationList`, `CreateConversation`, `GetChannelByID`, `InviteUsersToChannel`
+- Conversations: `GetConversationList`, `CreateConversation`, `GetChannelByID`, `InviteUsersToChannel`, `GetHistory`, `GetReplies`
 - Messages: `PostMessage`, `PostEphemeralMessage`, `UpdateMessage`
 - Users: `GetUserByID`, `GetUsersByID`, `GetUsersByGroupID`, `GetUserByEmail`
 
@@ -186,6 +187,51 @@ _ = raw
 ### `pkg/apis/gitlab`
 
 - `DownloadRawFileByURL`
+
+## Update Issue & ADF Helpers
+
+`UpdateIssue` is a general-purpose method for editing Jira issues. It supports both direct field values (`fields`) and update operations (`update`) as described in the [Jira REST API v3](https://docs.atlassian.com/jira/REST/cloud/#api/3/issue-editIssue).
+
+Jira API v3 requires rich text fields (`description`, `environment`, and some custom fields) to be in [Atlassian Document Format (ADF)](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/). The package provides two helpers for basic text conversion:
+
+- `TextToADF(text)` — converts plain text to ADF (`json.RawMessage`). Each line becomes a paragraph.
+- `ADFToText(adf)` — extracts plain text from ADF. Formatting (bold, links, tables) is discarded.
+
+```go
+// Update description with plain text converted to ADF
+_, err := jira.Issues().UpdateIssue(ctx, "PROJ-123", &atlassian.UpdateIssueRequest{
+    Fields: map[string]any{
+        "summary":     "New title",                                       // plain string
+        "description": atlassian.TextToADF("Line one\nLine two"),         // auto-converted to ADF
+        "labels":      []string{"backend", "urgent"},                     // array of strings
+        "assignee":    map[string]any{"accountId": "5b10a2844c20165700ab"},// object
+    },
+}, nil)
+
+// Use update operations (add/remove/set)
+_, err = jira.Issues().UpdateIssue(ctx, "PROJ-123", &atlassian.UpdateIssueRequest{
+    Update: map[string][]any{
+        "labels": {
+            map[string]string{"add": "reviewed"},
+            map[string]string{"remove": "needs-review"},
+        },
+    },
+}, nil)
+
+// Suppress email notifications and get updated issue back
+notify := false
+issue, err := jira.Issues().UpdateIssue(ctx, "PROJ-123", &atlassian.UpdateIssueRequest{
+    Fields: map[string]any{"priority": map[string]any{"name": "High"}},
+}, &atlassian.UpdateIssueOptions{
+    NotifyUsers: &notify,
+    ReturnIssue: true,
+})
+
+// Extract text from ADF (e.g. from issue.Fields)
+text := atlassian.ADFToText(someADFBody)
+```
+
+> **Note:** `TextToADF` / `ADFToText` handle plain text only. If you need rich formatting (tables, code blocks, mentions), construct ADF manually as `json.RawMessage` and pass it directly into `fields`.
 
 ## Error Handling
 

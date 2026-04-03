@@ -37,3 +37,20 @@ type User struct {
 	Email       string `json:"emailAddress,omitempty"`
 	Active      bool   `json:"active"`
 }
+
+// UpdateIssueRequest is the payload for PUT /rest/api/3/issue/{issueIdOrKey}.
+type UpdateIssueRequest struct {
+	Fields          map[string]any   `json:"fields,omitempty"`
+	Update          map[string][]any `json:"update,omitempty"`
+	Properties      []map[string]any `json:"properties,omitempty"`
+	HistoryMetadata map[string]any   `json:"historyMetadata,omitempty"`
+}
+
+// UpdateIssueOptions controls query parameters for issue update.
+type UpdateIssueOptions struct {
+	NotifyUsers            *bool
+	OverrideScreenSecurity bool
+	OverrideEditableFlag   bool
+	ReturnIssue            bool
+	Expand                 string
+}
