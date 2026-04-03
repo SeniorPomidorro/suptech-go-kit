@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -101,6 +102,96 @@ func (s *ConversationsService) GetChannelByID(ctx context.Context, channelID str
 		return nil, err
 	}
 	return &response.Channel, nil
+}
+
+// GetHistory fetches message history from a conversation.
+// Uses conversations.history Slack API method.
+func (s *ConversationsService) GetHistory(ctx context.Context, req *GetHistoryRequest) (*HistoryResponse, error) {
+	if req == nil {
+		return nil, errors.New("slack: request is required")
+	}
+	if strings.TrimSpace(req.Channel) == "" {
+		return nil, errors.New("slack: channel ID is required")
+	}
+
+	params := url.Values{}
+	params.Set("channel", req.Channel)
+	if req.Cursor != "" {
+		params.Set("cursor", req.Cursor)
+	}
+	if req.IncludeAllMetadata {
+		params.Set("include_all_metadata", "true")
+	}
+	if req.Inclusive {
+		params.Set("inclusive", "true")
+	}
+	if req.Latest != "" {
+		params.Set("latest", req.Latest)
+	}
+	if req.Oldest != "" {
+		params.Set("oldest", req.Oldest)
+	}
+	if req.Limit > 0 {
+		params.Set("limit", strconv.Itoa(req.Limit))
+	}
+
+	httpReq, err := s.client.newGetRequest(ctx, "conversations.history", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var response HistoryResponse
+	if err := s.client.do(httpReq, &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+// GetReplies fetches replies (thread messages) for a given parent message.
+// Uses conversations.replies Slack API method.
+func (s *ConversationsService) GetReplies(ctx context.Context, req *GetRepliesRequest) (*HistoryResponse, error) {
+	if req == nil {
+		return nil, errors.New("slack: request is required")
+	}
+	if strings.TrimSpace(req.Channel) == "" {
+		return nil, errors.New("slack: channel ID is required")
+	}
+	if strings.TrimSpace(req.TS) == "" {
+		return nil, errors.New("slack: thread timestamp is required")
+	}
+
+	params := url.Values{}
+	params.Set("channel", req.Channel)
+	params.Set("ts", req.TS)
+	if req.Cursor != "" {
+		params.Set("cursor", req.Cursor)
+	}
+	if req.IncludeAllMetadata {
+		params.Set("include_all_metadata", "true")
+	}
+	if req.Inclusive {
+		params.Set("inclusive", "true")
+	}
+	if req.Latest != "" {
+		params.Set("latest", req.Latest)
+	}
+	if req.Oldest != "" {
+		params.Set("oldest", req.Oldest)
+	}
+	if req.Limit > 0 {
+		params.Set("limit", strconv.Itoa(req.Limit))
+	}
+
+	httpReq, err := s.client.newGetRequest(ctx, "conversations.replies", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var response HistoryResponse
+	if err := s.client.do(httpReq, &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
 }
 
 // InviteUsersToChannel invites users to a channel.
