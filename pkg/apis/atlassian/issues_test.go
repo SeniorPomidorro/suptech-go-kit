@@ -103,6 +103,129 @@ func TestManageTagsReplace(t *testing.T) {
 	}
 }
 
+func TestCreateIssue(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/api/3/issue" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
+		}
+		fields, ok := payload["fields"].(map[string]any)
+		if !ok {
+			t.Fatalf("fields block missing")
+		}
+		if fields["summary"] != "New task" {
+			t.Fatalf("unexpected summary: %v", fields["summary"])
+		}
+		project, ok := fields["project"].(map[string]any)
+		if !ok {
+			t.Fatalf("project block missing")
+		}
+		if project["key"] != "PROJ" {
+			t.Fatalf("unexpected project key: %v", project["key"])
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"10001","key":"PROJ-1","self":"https://example.atlassian.net/rest/api/3/issue/10001"}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	created, err := client.Issues().CreateIssue(context.Background(), &CreateIssueRequest{
+		Fields: map[string]any{
+			"summary":   "New task",
+			"project":   map[string]any{"key": "PROJ"},
+			"issuetype": map[string]any{"name": "Task"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	if created.Key != "PROJ-1" {
+		t.Fatalf("unexpected key: %q", created.Key)
+	}
+	if created.ID != "10001" {
+		t.Fatalf("unexpected id: %q", created.ID)
+	}
+}
+
+func TestCreateIssueWithADF(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Fields struct {
+				Description json.RawMessage `json:"description"`
+			} `json:"fields"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
+		}
+
+		var doc struct {
+			Type    string `json:"type"`
+			Version int    `json:"version"`
+		}
+		if err := json.Unmarshal(payload.Fields.Description, &doc); err != nil {
+			t.Fatalf("unmarshal ADF: %v", err)
+		}
+		if doc.Type != "doc" || doc.Version != 1 {
+			t.Fatalf("expected ADF doc, got type=%q version=%d", doc.Type, doc.Version)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"10002","key":"PROJ-2"}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	created, err := client.Issues().CreateIssue(context.Background(), &CreateIssueRequest{
+		Fields: map[string]any{
+			"summary":     "Task with description",
+			"project":     map[string]any{"key": "PROJ"},
+			"issuetype":   map[string]any{"name": "Task"},
+			"description": TextToADF("Task description\nSecond line"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue with ADF: %v", err)
+	}
+	if created.Key != "PROJ-2" {
+		t.Fatalf("unexpected key: %q", created.Key)
+	}
+}
+
+func TestCreateIssueValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(WithBaseURL("https://example.com"), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	if _, err := client.Issues().CreateIssue(context.Background(), nil); err == nil {
+		t.Fatalf("expected error for nil body")
+	}
+}
+
 func TestUpdateIssueFields(t *testing.T) {
 	t.Parallel()
 

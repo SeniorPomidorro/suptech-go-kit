@@ -38,6 +38,21 @@ type User struct {
 	Active      bool   `json:"active"`
 }
 
+// CreateIssueRequest is the payload for POST /rest/api/3/issue.
+type CreateIssueRequest struct {
+	Fields          map[string]any   `json:"fields,omitempty"`
+	Update          map[string][]any `json:"update,omitempty"`
+	Properties      []map[string]any `json:"properties,omitempty"`
+	HistoryMetadata map[string]any   `json:"historyMetadata,omitempty"`
+}
+
+// CreatedIssue is the response from POST /rest/api/3/issue.
+type CreatedIssue struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Self string `json:"self,omitempty"`
+}
+
 // UpdateIssueRequest is the payload for PUT /rest/api/3/issue/{issueIdOrKey}.
 type UpdateIssueRequest struct {
 	Fields          map[string]any   `json:"fields,omitempty"`

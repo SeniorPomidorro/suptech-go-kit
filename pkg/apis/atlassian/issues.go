@@ -75,6 +75,24 @@ func (s *IssuesService) GetIssue(ctx context.Context, ticketKey string) (*Issue,
 	return &issue, nil
 }
 
+// CreateIssue creates a new Jira issue.
+func (s *IssuesService) CreateIssue(ctx context.Context, body *CreateIssueRequest) (*CreatedIssue, error) {
+	if body == nil {
+		return nil, errors.New("atlassian: create request body is required")
+	}
+
+	req, err := s.client.newRequest(ctx, http.MethodPost, "/rest/api/3/issue", nil, body)
+	if err != nil {
+		return nil, err
+	}
+
+	var created CreatedIssue
+	if err := s.client.transport.DoJSON(req, &created); err != nil {
+		return nil, err
+	}
+	return &created, nil
+}
+
 // SaveStoryPoints updates Jira custom field for story points.
 func (s *IssuesService) SaveStoryPoints(ctx context.Context, ticketKey string, points float64, fieldID string) error {
 	if strings.TrimSpace(ticketKey) == "" {
@@ -249,7 +267,7 @@ func (s *IssuesService) CreateComment(ctx context.Context, ticketKey, text strin
 		return nil, errors.New("atlassian: comment text is required")
 	}
 
-	payload := map[string]any{"body": text}
+	payload := map[string]any{"body": TextToADF(text)}
 	if internal {
 		payload["properties"] = []map[string]any{{
 			"key":   "sd.public.comment",
