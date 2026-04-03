@@ -43,10 +43,44 @@ type User struct {
 
 // Message is a minimal Slack message DTO.
 type Message struct {
-	Type string `json:"type,omitempty"`
-	User string `json:"user,omitempty"`
-	Text string `json:"text,omitempty"`
-	TS   string `json:"ts,omitempty"`
+	Type       string `json:"type,omitempty"`
+	SubType    string `json:"subtype,omitempty"`
+	User       string `json:"user,omitempty"`
+	Text       string `json:"text,omitempty"`
+	TS         string `json:"ts,omitempty"`
+	ThreadTS   string `json:"thread_ts,omitempty"`
+	ReplyCount int    `json:"reply_count,omitempty"`
+}
+
+// GetHistoryRequest contains parameters for conversations.history.
+type GetHistoryRequest struct {
+	Channel            string `json:"channel"`
+	Cursor             string `json:"cursor,omitempty"`
+	IncludeAllMetadata bool   `json:"include_all_metadata,omitempty"`
+	Inclusive          bool   `json:"inclusive,omitempty"`
+	Latest             string `json:"latest,omitempty"`
+	Oldest             string `json:"oldest,omitempty"`
+	Limit              int    `json:"limit,omitempty"`
+}
+
+// GetRepliesRequest contains parameters for conversations.replies.
+type GetRepliesRequest struct {
+	Channel            string `json:"channel"`
+	TS                 string `json:"ts"`
+	Cursor             string `json:"cursor,omitempty"`
+	IncludeAllMetadata bool   `json:"include_all_metadata,omitempty"`
+	Inclusive          bool   `json:"inclusive,omitempty"`
+	Latest             string `json:"latest,omitempty"`
+	Oldest             string `json:"oldest,omitempty"`
+	Limit              int    `json:"limit,omitempty"`
+}
+
+// HistoryResponse is the response from conversations.history and conversations.replies.
+type HistoryResponse struct {
+	Messages         []Message        `json:"messages"`
+	HasMore          bool             `json:"has_more"`
+	PinCount         int              `json:"pin_count,omitempty"`
+	ResponseMetadata ResponseMetadata `json:"response_metadata"`
 }
 
 // PostedMessage contains main fields returned by chat post/update methods.
