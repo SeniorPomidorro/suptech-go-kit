@@ -714,11 +714,11 @@ func TestADFToText_UnknownMarkType(t *testing.T) {
 
 func TestADFToText_UnknownNodeType(t *testing.T) {
 	t.Parallel()
-	// Unknown top-level node type — should extract text via fallback.
-	adf := `{"type":"doc","version":1,"content":[{"type":"heading","content":[{"type":"text","text":"title"}]}]}`
+	// Unknown top-level node type — should extract text via default fallback.
+	adf := `{"type":"doc","version":1,"content":[{"type":"mediaGroup","content":[{"type":"text","text":"fallback text"}]}]}`
 	got := ADFToText(json.RawMessage(adf))
-	if got != "title" {
-		t.Fatalf("want %q, got %q", "title", got)
+	if got != "fallback text" {
+		t.Fatalf("want %q, got %q", "fallback text", got)
 	}
 }
 
@@ -884,6 +884,60 @@ func TestADFToText_EmptyBulletList(t *testing.T) {
 	got := ADFToText(json.RawMessage(adf))
 	if got != "" {
 		t.Fatalf("want %q, got %q", "", got)
+	}
+}
+
+// --- ADFToText: inline fallback for unknown node types ---
+
+func TestADFToText_InlineMention(t *testing.T) {
+	t.Parallel()
+	// mention node has text field but is not type "text" — should still render.
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"hello "},{"type":"mention","text":"@john"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "hello @john" {
+		t.Fatalf("want %q, got %q", "hello @john", got)
+	}
+}
+
+func TestADFToText_InlineEmoji(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"emoji","text":":fire:"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != ":fire:" {
+		t.Fatalf("want %q, got %q", ":fire:", got)
+	}
+}
+
+func TestADFToText_InlineUnknownWithContent(t *testing.T) {
+	t.Parallel()
+	// Unknown inline node with nested text content.
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"status","content":[{"type":"text","text":"IN PROGRESS"}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "IN PROGRESS" {
+		t.Fatalf("want %q, got %q", "IN PROGRESS", got)
+	}
+}
+
+func TestADFToText_InlineUnknownEmpty(t *testing.T) {
+	t.Parallel()
+	// Unknown inline node with no text and no content — should produce nothing.
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"before"},{"type":"date"},{"type":"text","text":"after"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "beforeafter" {
+		t.Fatalf("want %q, got %q", "beforeafter", got)
+	}
+}
+
+// --- ADFToText: listItem with direct text children (no paragraph wrapper) ---
+
+func TestADFToText_BulletListDirectText(t *testing.T) {
+	t.Parallel()
+	// listItem contains text nodes directly, without a paragraph wrapper.
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"text","text":"item one"}]},{"type":"listItem","content":[{"type":"text","text":"item two"}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- item one\n- item two"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
 	}
 }
 

@@ -346,6 +346,7 @@ func renderBlocks(b *strings.Builder, nodes []adfNode, depth int) {
 			b.WriteByte('\n')
 		case adfTypeText:
 			renderInlineNodes(b, []adfNode{node})
+			b.WriteByte('\n')
 		default:
 			renderBlocks(b, node.Content, depth)
 		}
@@ -361,11 +362,10 @@ var markToDelim = map[string]byte{
 
 func renderInlineNodes(b *strings.Builder, nodes []adfNode) {
 	for _, node := range nodes {
-		if node.Type == adfTypeHardBreak {
+		switch {
+		case node.Type == adfTypeHardBreak:
 			b.WriteByte('\n')
-			continue
-		}
-		if node.Type == adfTypeText {
+		case node.Type == adfTypeText:
 			// Determine which delimiters wrap this text node.
 			var open, close strings.Builder
 			for _, m := range node.Marks {
@@ -381,9 +381,15 @@ func renderInlineNodes(b *strings.Builder, nodes []adfNode) {
 			for j := len(cl) - 1; j >= 0; j-- {
 				b.WriteByte(cl[j])
 			}
-		}
-		if len(node.Content) > 0 {
-			renderInlineNodes(b, node.Content)
+		default:
+			// Unknown inline nodes (mention, emoji, inlineCard, etc.):
+			// extract any nested text or fall back to node's own text field.
+			if node.Text != "" {
+				b.WriteString(node.Text)
+			}
+			if len(node.Content) > 0 {
+				renderInlineNodes(b, node.Content)
+			}
 		}
 	}
 }
