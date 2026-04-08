@@ -753,6 +753,140 @@ func TestADFToText_MixedKnownAndUnknownMarks(t *testing.T) {
 	}
 }
 
+// --- ADFToText: plain string fallback ---
+
+func TestADFToText_PlainStringFallback(t *testing.T) {
+	t.Parallel()
+	adf := `"just a plain string from API v2"`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "just a plain string from API v2" {
+		t.Fatalf("want %q, got %q", "just a plain string from API v2", got)
+	}
+}
+
+func TestADFToText_PlainStringEmpty(t *testing.T) {
+	t.Parallel()
+	adf := `""`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "" {
+		t.Fatalf("want %q, got %q", "", got)
+	}
+}
+
+func TestADFToText_PlainStringWithSpecialChars(t *testing.T) {
+	t.Parallel()
+	adf := `"line1\nline2\ttab"`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "line1\nline2\ttab" {
+		t.Fatalf("want %q, got %q", "line1\nline2\ttab", got)
+	}
+}
+
+// --- ADFToText: heading ---
+
+func TestADFToText_Heading(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"heading","content":[{"type":"text","text":"Title"}]},{"type":"paragraph","content":[{"type":"text","text":"body"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "Title\nbody" {
+		t.Fatalf("want %q, got %q", "Title\nbody", got)
+	}
+}
+
+func TestADFToText_HeadingWithMarks(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"heading","content":[{"type":"text","text":"bold title","marks":[{"type":"strong"}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "*bold title*" {
+		t.Fatalf("want %q, got %q", "*bold title*", got)
+	}
+}
+
+// --- ADFToText: hardBreak ---
+
+func TestADFToText_HardBreak(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"line1"},{"type":"hardBreak"},{"type":"text","text":"line2"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "line1\nline2" {
+		t.Fatalf("want %q, got %q", "line1\nline2", got)
+	}
+}
+
+func TestADFToText_MultipleHardBreaks(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"a"},{"type":"hardBreak"},{"type":"hardBreak"},{"type":"text","text":"b"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "a\n\nb" {
+		t.Fatalf("want %q, got %q", "a\n\nb", got)
+	}
+}
+
+// --- ADFToText: bullet list ---
+
+func TestADFToText_BulletList(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"item 1"}]}]},{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"item 2"}]}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- item 1\n- item 2"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+func TestADFToText_BulletListNested(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"parent"}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"child"}]}]}]}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- parent\n  - child"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+func TestADFToText_BulletListWithMarks(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"bold item","marks":[{"type":"strong"}]}]}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- *bold item*"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+// --- ADFToText: ordered list ---
+
+func TestADFToText_OrderedList(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"orderedList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"first"}]}]},{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"second"}]}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- first\n- second"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+// --- ADFToText: mixed blocks with lists ---
+
+func TestADFToText_MixedParagraphAndList(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"intro"}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"item"}]}]}]},{"type":"paragraph","content":[{"type":"text","text":"outro"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "intro\n- item\noutro"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+func TestADFToText_EmptyBulletList(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "" {
+		t.Fatalf("want %q, got %q", "", got)
+	}
+}
+
 // --- Round-trip tests ---
 
 func TestRoundTrip_Bold(t *testing.T) {
