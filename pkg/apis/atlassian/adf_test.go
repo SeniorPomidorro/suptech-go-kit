@@ -714,11 +714,11 @@ func TestADFToText_UnknownMarkType(t *testing.T) {
 
 func TestADFToText_UnknownNodeType(t *testing.T) {
 	t.Parallel()
-	// Unknown top-level node type — should extract text via fallback.
-	adf := `{"type":"doc","version":1,"content":[{"type":"heading","content":[{"type":"text","text":"title"}]}]}`
+	// Unknown top-level node type — should extract text via default fallback.
+	adf := `{"type":"doc","version":1,"content":[{"type":"mediaGroup","content":[{"type":"text","text":"fallback text"}]}]}`
 	got := ADFToText(json.RawMessage(adf))
-	if got != "title" {
-		t.Fatalf("want %q, got %q", "title", got)
+	if got != "fallback text" {
+		t.Fatalf("want %q, got %q", "fallback text", got)
 	}
 }
 
@@ -750,6 +750,194 @@ func TestADFToText_MixedKnownAndUnknownMarks(t *testing.T) {
 	got := ADFToText(json.RawMessage(adf))
 	if got != "*click*" {
 		t.Fatalf("want %q, got %q", "*click*", got)
+	}
+}
+
+// --- ADFToText: plain string fallback ---
+
+func TestADFToText_PlainStringFallback(t *testing.T) {
+	t.Parallel()
+	adf := `"just a plain string from API v2"`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "just a plain string from API v2" {
+		t.Fatalf("want %q, got %q", "just a plain string from API v2", got)
+	}
+}
+
+func TestADFToText_PlainStringEmpty(t *testing.T) {
+	t.Parallel()
+	adf := `""`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "" {
+		t.Fatalf("want %q, got %q", "", got)
+	}
+}
+
+func TestADFToText_PlainStringWithSpecialChars(t *testing.T) {
+	t.Parallel()
+	adf := `"line1\nline2\ttab"`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "line1\nline2\ttab" {
+		t.Fatalf("want %q, got %q", "line1\nline2\ttab", got)
+	}
+}
+
+// --- ADFToText: heading ---
+
+func TestADFToText_Heading(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"heading","content":[{"type":"text","text":"Title"}]},{"type":"paragraph","content":[{"type":"text","text":"body"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "Title\nbody" {
+		t.Fatalf("want %q, got %q", "Title\nbody", got)
+	}
+}
+
+func TestADFToText_HeadingWithMarks(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"heading","content":[{"type":"text","text":"bold title","marks":[{"type":"strong"}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "*bold title*" {
+		t.Fatalf("want %q, got %q", "*bold title*", got)
+	}
+}
+
+// --- ADFToText: hardBreak ---
+
+func TestADFToText_HardBreak(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"line1"},{"type":"hardBreak"},{"type":"text","text":"line2"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "line1\nline2" {
+		t.Fatalf("want %q, got %q", "line1\nline2", got)
+	}
+}
+
+func TestADFToText_MultipleHardBreaks(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"a"},{"type":"hardBreak"},{"type":"hardBreak"},{"type":"text","text":"b"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "a\n\nb" {
+		t.Fatalf("want %q, got %q", "a\n\nb", got)
+	}
+}
+
+// --- ADFToText: bullet list ---
+
+func TestADFToText_BulletList(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"item 1"}]}]},{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"item 2"}]}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- item 1\n- item 2"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+func TestADFToText_BulletListNested(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"parent"}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"child"}]}]}]}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- parent\n  - child"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+func TestADFToText_BulletListWithMarks(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"bold item","marks":[{"type":"strong"}]}]}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- *bold item*"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+// --- ADFToText: ordered list ---
+
+func TestADFToText_OrderedList(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"orderedList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"first"}]}]},{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"second"}]}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- first\n- second"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+// --- ADFToText: mixed blocks with lists ---
+
+func TestADFToText_MixedParagraphAndList(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"intro"}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"item"}]}]}]},{"type":"paragraph","content":[{"type":"text","text":"outro"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "intro\n- item\noutro"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+func TestADFToText_EmptyBulletList(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "" {
+		t.Fatalf("want %q, got %q", "", got)
+	}
+}
+
+// --- ADFToText: inline fallback for unknown node types ---
+
+func TestADFToText_InlineMention(t *testing.T) {
+	t.Parallel()
+	// mention node has text field but is not type "text" — should still render.
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"hello "},{"type":"mention","text":"@john"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "hello @john" {
+		t.Fatalf("want %q, got %q", "hello @john", got)
+	}
+}
+
+func TestADFToText_InlineEmoji(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"emoji","text":":fire:"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != ":fire:" {
+		t.Fatalf("want %q, got %q", ":fire:", got)
+	}
+}
+
+func TestADFToText_InlineUnknownWithContent(t *testing.T) {
+	t.Parallel()
+	// Unknown inline node with nested text content.
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"status","content":[{"type":"text","text":"IN PROGRESS"}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "IN PROGRESS" {
+		t.Fatalf("want %q, got %q", "IN PROGRESS", got)
+	}
+}
+
+func TestADFToText_InlineUnknownEmpty(t *testing.T) {
+	t.Parallel()
+	// Unknown inline node with no text and no content — should produce nothing.
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"before"},{"type":"date"},{"type":"text","text":"after"}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "beforeafter" {
+		t.Fatalf("want %q, got %q", "beforeafter", got)
+	}
+}
+
+// --- ADFToText: listItem with direct text children (no paragraph wrapper) ---
+
+func TestADFToText_BulletListDirectText(t *testing.T) {
+	t.Parallel()
+	// listItem contains text nodes directly, without a paragraph wrapper.
+	adf := `{"type":"doc","version":1,"content":[{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"text","text":"item one"}]},{"type":"listItem","content":[{"type":"text","text":"item two"}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "- item one\n- item two"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
 	}
 }
 

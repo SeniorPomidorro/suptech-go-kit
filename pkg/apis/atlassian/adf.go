@@ -7,10 +7,15 @@ import (
 
 // ADF node types.
 const (
-	adfTypeDoc       = "doc"
-	adfTypeParagraph = "paragraph"
-	adfTypeText      = "text"
-	adfTypeCodeBlock = "codeBlock"
+	adfTypeDoc         = "doc"
+	adfTypeParagraph   = "paragraph"
+	adfTypeText        = "text"
+	adfTypeCodeBlock   = "codeBlock"
+	adfTypeHeading     = "heading"
+	adfTypeBulletList  = "bulletList"
+	adfTypeOrderedList = "orderedList"
+	adfTypeListItem    = "listItem"
+	adfTypeHardBreak   = "hardBreak"
 )
 
 // ADF mark types.
@@ -296,10 +301,19 @@ func parseInline(text string) []adfNode {
 //	code      → `text`
 //
 // Code blocks are rendered with ``` fences.
+// Lists (bullet/ordered), headings, and hardBreak nodes are also supported.
+//
+// If the input is a plain JSON string (e.g. from Jira API v2), it is returned as-is.
 // Returns empty string if the input is empty or not valid JSON.
 func ADFToText(adf json.RawMessage) string {
 	if len(adf) == 0 {
 		return ""
+	}
+
+	// Plain string fallback (Jira API v2 returns text fields as strings).
+	var plain string
+	if err := json.Unmarshal(adf, &plain); err == nil {
+		return plain
 	}
 
 	var doc adfNode
@@ -308,22 +322,35 @@ func ADFToText(adf json.RawMessage) string {
 	}
 
 	var b strings.Builder
-	for i, node := range doc.Content {
-		if i > 0 {
-			b.WriteByte('\n')
-		}
+	renderBlocks(&b, doc.Content, 0)
+	return strings.TrimSpace(b.String())
+}
+
+func renderBlocks(b *strings.Builder, nodes []adfNode, depth int) {
+	for _, node := range nodes {
 		switch node.Type {
 		case adfTypeCodeBlock:
 			b.WriteString("```\n")
-			extractPlainText(&b, node.Content)
-			b.WriteString("\n```")
-		case adfTypeParagraph:
-			renderInlineNodes(&b, node.Content)
+			extractPlainText(b, node.Content)
+			b.WriteString("\n```\n")
+		case adfTypeParagraph, adfTypeHeading:
+			renderInlineNodes(b, node.Content)
+			b.WriteByte('\n')
+		case adfTypeBulletList, adfTypeOrderedList:
+			renderBlocks(b, node.Content, depth)
+		case adfTypeListItem:
+			b.WriteString(strings.Repeat("  ", depth))
+			b.WriteString("- ")
+			renderBlocks(b, node.Content, depth+1)
+		case adfTypeHardBreak:
+			b.WriteByte('\n')
+		case adfTypeText:
+			renderInlineNodes(b, []adfNode{node})
+			b.WriteByte('\n')
 		default:
-			extractPlainText(&b, node.Content)
+			renderBlocks(b, node.Content, depth)
 		}
 	}
-	return b.String()
 }
 
 var markToDelim = map[string]byte{
@@ -335,7 +362,10 @@ var markToDelim = map[string]byte{
 
 func renderInlineNodes(b *strings.Builder, nodes []adfNode) {
 	for _, node := range nodes {
-		if node.Type == adfTypeText {
+		switch {
+		case node.Type == adfTypeHardBreak:
+			b.WriteByte('\n')
+		case node.Type == adfTypeText:
 			// Determine which delimiters wrap this text node.
 			var open, close strings.Builder
 			for _, m := range node.Marks {
@@ -351,9 +381,15 @@ func renderInlineNodes(b *strings.Builder, nodes []adfNode) {
 			for j := len(cl) - 1; j >= 0; j-- {
 				b.WriteByte(cl[j])
 			}
-		}
-		if len(node.Content) > 0 {
-			renderInlineNodes(b, node.Content)
+		default:
+			// Unknown inline nodes (mention, emoji, inlineCard, etc.):
+			// extract any nested text or fall back to node's own text field.
+			if node.Text != "" {
+				b.WriteString(node.Text)
+			}
+			if len(node.Content) > 0 {
+				renderInlineNodes(b, node.Content)
+			}
 		}
 	}
 }
