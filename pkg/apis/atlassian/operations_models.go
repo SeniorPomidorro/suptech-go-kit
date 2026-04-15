@@ -80,13 +80,13 @@ type Schedule struct {
 
 // Rotation represents a schedule rotation.
 type Rotation struct {
-	ID           string           `json:"id,omitempty"`
-	Name         string           `json:"name,omitempty"`
-	StartDate    string           `json:"startDate,omitempty"`
-	EndDate      string           `json:"endDate,omitempty"`
-	Type         string           `json:"type,omitempty"`
-	Length       int              `json:"length,omitempty"`
-	Participants []ResponderInfo  `json:"participants,omitempty"`
+	ID           string          `json:"id,omitempty"`
+	Name         string          `json:"name,omitempty"`
+	StartDate    string          `json:"startDate,omitempty"`
+	EndDate      string          `json:"endDate,omitempty"`
+	Type         string          `json:"type,omitempty"`
+	Length       int             `json:"length,omitempty"`
+	Participants []ResponderInfo `json:"participants,omitempty"`
 }
 
 // ResponderInfo identifies a participant in a rotation.
@@ -117,6 +117,7 @@ type OnCallParticipant struct {
 // OnCallResult wraps on-call response.
 type OnCallResult struct {
 	OnCallParticipants []OnCallParticipant `json:"onCallParticipants,omitempty"`
+	OnCallUsers        []string            `json:"onCallUsers,omitempty"`
 }
 
 // ListOnCallOptions controls on-call listing.
