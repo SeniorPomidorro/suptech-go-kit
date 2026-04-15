@@ -1,5 +1,7 @@
 package slack
 
+import "time"
+
 // ResponseMetadata is Slack cursor pagination metadata.
 type ResponseMetadata struct {
 	NextCursor string `json:"next_cursor"`
@@ -31,14 +33,80 @@ type Conversation struct {
 	ContextTeamID string `json:"context_team_id,omitempty"`
 }
 
-// User is a minimal Slack user DTO.
+// User is Slack user DTO.
 type User struct {
-	ID       string `json:"id"`
-	TeamID   string `json:"team_id,omitempty"`
-	Name     string `json:"name,omitempty"`
-	RealName string `json:"real_name,omitempty"`
-	Deleted  bool   `json:"deleted,omitempty"`
-	IsBot    bool   `json:"is_bot,omitempty"`
+	ID                     string      `json:"id"`
+	Name                   string      `json:"name,omitempty"`
+	IsBot                  bool        `json:"is_bot,omitempty"`
+	Updated                int64       `json:"updated,omitempty"`
+	IsAppUser              bool        `json:"is_app_user,omitempty"`
+	TeamID                 string      `json:"team_id,omitempty"`
+	Deleted                bool        `json:"deleted,omitempty"`
+	Color                  string      `json:"color,omitempty"`
+	IsEmailConfirmed       bool        `json:"is_email_confirmed,omitempty"`
+	RealName               string      `json:"real_name,omitempty"`
+	TZ                     string      `json:"tz,omitempty"`
+	TZLabel                string      `json:"tz_label,omitempty"`
+	TZOffset               int         `json:"tz_offset,omitempty"`
+	IsAdmin                bool        `json:"is_admin,omitempty"`
+	IsOwner                bool        `json:"is_owner,omitempty"`
+	IsPrimaryOwner         bool        `json:"is_primary_owner,omitempty"`
+	IsRestricted           bool        `json:"is_restricted,omitempty"`
+	IsUltraRestricted      bool        `json:"is_ultra_restricted,omitempty"`
+	WhoCanShareContactCard string      `json:"who_can_share_contact_card,omitempty"`
+	Profile                UserProfile `json:"profile,omitempty"`
+}
+
+// UserProfile is Slack user profile payload.
+type UserProfile struct {
+	RealName               string `json:"real_name,omitempty"`
+	DisplayName            string `json:"display_name,omitempty"`
+	AvatarHash             string `json:"avatar_hash,omitempty"`
+	RealNameNormalized     string `json:"real_name_normalized,omitempty"`
+	DisplayNameNormalized  string `json:"display_name_normalized,omitempty"`
+	Image24                string `json:"image_24,omitempty"`
+	Image32                string `json:"image_32,omitempty"`
+	Image48                string `json:"image_48,omitempty"`
+	Image72                string `json:"image_72,omitempty"`
+	Image192               string `json:"image_192,omitempty"`
+	Image512               string `json:"image_512,omitempty"`
+	Image1024              string `json:"image_1024,omitempty"`
+	ImageOriginal          string `json:"image_original,omitempty"`
+	IsCustomImage          bool   `json:"is_custom_image,omitempty"`
+	FirstName              string `json:"first_name,omitempty"`
+	LastName               string `json:"last_name,omitempty"`
+	Team                   string `json:"team,omitempty"`
+	Email                  string `json:"email,omitempty"`
+	Title                  string `json:"title,omitempty"`
+	Phone                  string `json:"phone,omitempty"`
+	Skype                  string `json:"skype,omitempty"`
+	StatusText             string `json:"status_text,omitempty"`
+	StatusTextCanonical    string `json:"status_text_canonical,omitempty"`
+	StatusEmoji            string `json:"status_emoji,omitempty"`
+	StatusEmojiDisplayInfo []any  `json:"status_emoji_display_info,omitempty"`
+	StatusExpiration       int    `json:"status_expiration,omitempty"`
+	BotID                  string `json:"bot_id,omitempty"`
+	APIAppID               string `json:"api_app_id,omitempty"`
+	AlwaysActive           bool   `json:"always_active,omitempty"`
+}
+
+// ListUsersRequest contains parameters for users.list.
+type ListUsersRequest struct {
+	Cursor        string `json:"cursor,omitempty"`
+	IncludeLocale bool   `json:"include_locale,omitempty"`
+	Limit         int    `json:"limit,omitempty"`
+	TeamID        string
+	FetchAll      bool
+	// FetchAllThrottle defines pause between page requests when FetchAll=true.
+	// If <=0, a safe default of 1 second is used.
+	FetchAllThrottle time.Duration
+}
+
+// ListUsersResponse is the response from users.list.
+type ListUsersResponse struct {
+	Members          []User           `json:"members"`
+	CacheTS          int64            `json:"cache_ts,omitempty"`
+	ResponseMetadata ResponseMetadata `json:"response_metadata"`
 }
 
 // Message is a minimal Slack message DTO.
