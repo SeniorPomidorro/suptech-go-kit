@@ -3,9 +3,14 @@ package slack
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 )
+
+const defaultListUsersFetchAllThrottle = time.Second
 
 // UsersService provides Slack users operations.
 type UsersService struct {
@@ -100,4 +105,85 @@ func (s *UsersService) GetUserByEmail(ctx context.Context, email string) (*User,
 		return nil, err
 	}
 	return &response.User, nil
+}
+
+// ListUsers returns users from users.list and optionally fetches all pages.
+func (s *UsersService) ListUsers(ctx context.Context, req *ListUsersRequest) (*ListUsersResponse, error) {
+	if req == nil {
+		req = &ListUsersRequest{}
+	}
+
+	teamID := strings.TrimSpace(req.TeamID)
+	cursor := strings.TrimSpace(req.Cursor)
+	combined := make([]User, 0)
+	seenCursors := make(map[string]struct{})
+	if cursor != "" && req.FetchAll {
+		seenCursors[cursor] = struct{}{}
+	}
+	throttle := req.FetchAllThrottle
+	if throttle <= 0 {
+		throttle = defaultListUsersFetchAllThrottle
+	}
+
+	for {
+		params := url.Values{}
+		if cursor != "" {
+			params.Set("cursor", cursor)
+		}
+		if req.IncludeLocale {
+			params.Set("include_locale", "true")
+		}
+		if req.Limit > 0 {
+			params.Set("limit", strconv.Itoa(req.Limit))
+		}
+		if teamID != "" {
+			params.Set("team_id", teamID)
+		} else {
+			s.client.withTeamID(params)
+		}
+
+		httpReq, err := s.client.newGetRequest(ctx, "users.list", params)
+		if err != nil {
+			return nil, err
+		}
+
+		var response ListUsersResponse
+		if err := s.client.do(httpReq, &response); err != nil {
+			return nil, err
+		}
+
+		if !req.FetchAll {
+			return &response, nil
+		}
+
+		combined = append(combined, response.Members...)
+		cursor = strings.TrimSpace(response.ResponseMetadata.NextCursor)
+		if cursor == "" {
+			response.Members = combined
+			response.ResponseMetadata.NextCursor = ""
+			return &response, nil
+		}
+		if _, exists := seenCursors[cursor]; exists {
+			return nil, fmt.Errorf("slack: users.list returned repeated cursor %q", cursor)
+		}
+		seenCursors[cursor] = struct{}{}
+		if err := sleepWithContext(ctx, throttle); err != nil {
+			return nil, err
+		}
+	}
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

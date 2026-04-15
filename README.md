@@ -178,7 +178,7 @@ _ = raw
 - User groups: `CreateUserGroup`, `ListUserGroups`
 - Conversations: `GetConversationList`, `CreateConversation`, `GetChannelByID`, `InviteUsersToChannel`, `GetHistory`, `GetReplies`
 - Messages: `PostMessage`, `PostEphemeralMessage`, `UpdateMessage`
-- Users: `GetUserByID`, `GetUsersByID`, `GetUsersByGroupID`, `GetUserByEmail`
+- Users: `GetUserByID`, `GetUsersByID`, `GetUsersByGroupID`, `GetUserByEmail`, `ListUsers` (`FetchAll`)
 
 - Views: `OpenView`, `UpdateView`
 - Canvas: `CreateCanvas`, `ShareCanvas`
