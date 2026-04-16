@@ -16,6 +16,23 @@ type UserGroup struct {
 	Description string `json:"description,omitempty"`
 }
 
+// ListUserGroupUsersRequest contains parameters for usergroups.users.list.
+type ListUserGroupUsersRequest struct {
+	UserGroup       string `json:"usergroup"`
+	IncludeDisabled bool   `json:"include_disabled,omitempty"`
+	TeamID          string `json:"team_id,omitempty"`
+}
+
+// UpdateUserGroupUsersRequest contains parameters for usergroups.users.update.
+type UpdateUserGroupUsersRequest struct {
+	UserGroup          string   `json:"usergroup"`
+	Users              []string `json:"users"`
+	IncludeCount       bool     `json:"include_count,omitempty"`
+	TeamID             string   `json:"team_id,omitempty"`
+	AdditionalChannels []string `json:"additional_channels,omitempty"`
+	IsShared           bool     `json:"is_shared,omitempty"`
+}
+
 // Conversation is a minimal Slack conversation DTO.
 type Conversation struct {
 	ID            string `json:"id"`
