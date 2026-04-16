@@ -1,6 +1,9 @@
 package atlassian
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Issue is a minimal Jira issue DTO for client consumers.
 type Issue struct {
@@ -36,6 +39,30 @@ type User struct {
 	DisplayName string `json:"displayName"`
 	Email       string `json:"emailAddress,omitempty"`
 	Active      bool   `json:"active"`
+}
+
+// BulkGetUsersOptions controls GET /rest/api/3/user/bulk query parameters.
+type BulkGetUsersOptions struct {
+	StartAt    int
+	MaxResults int
+	Usernames  []string
+	Keys       []string
+	AccountIDs []string
+	FetchAll   bool
+	// FetchAllThrottle defines pause between page requests when FetchAll=true.
+	// If <=0, a default of 200 milliseconds is used.
+	FetchAllThrottle time.Duration
+}
+
+// BulkUsersResult is a paginated response from GET /rest/api/3/user/bulk.
+type BulkUsersResult struct {
+	Self       string `json:"self,omitempty"`
+	NextPage   string `json:"nextPage,omitempty"`
+	MaxResults int    `json:"maxResults,omitempty"`
+	StartAt    int    `json:"startAt,omitempty"`
+	Total      int    `json:"total,omitempty"`
+	IsLast     bool   `json:"isLast,omitempty"`
+	Values     []User `json:"values,omitempty"`
 }
 
 // CreateIssueRequest is the payload for POST /rest/api/3/issue.

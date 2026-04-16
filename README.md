@@ -167,7 +167,7 @@ _ = raw
 
 - Issues: `CreateIssue`, `GetIssue`, `UpdateIssue`, `SaveStoryPoints`, `FindIssues` (`FetchAll`), `ManageTags`, `CreateComment`, `AddAttachment`
 - ADF helpers: `TextToADF`, `ADFToText`
-- Users: `FindUsers`
+- Users: `FindUsers`, `BulkGetUsers`
 - Assets: `SearchObjectsAQL` (`FetchAll`), `CreateObject`, `DeleteObject`, `UpdateObject`, `GetObject`
   - Structured request types: `CreateAssetObjectRequest`, `UpdateAssetObjectRequest`
   - Simplified factory functions: `NewCreateAssetObjectRequest`, `NewUpdateAssetObjectRequest`
