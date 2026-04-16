@@ -175,7 +175,7 @@ _ = raw
 
 ### `pkg/apis/slack`
 
-- User groups: `CreateUserGroup`, `ListUserGroups`
+- User groups: `CreateUserGroup`, `ListUserGroups`, `ListUserGroupUsers`, `UpdateUserGroupUsers`
 - Conversations: `GetConversationList`, `CreateConversation`, `GetChannelByID`, `InviteUsersToChannel`, `GetHistory`, `GetReplies`
 - Messages: `PostMessage`, `PostEphemeralMessage`, `UpdateMessage`
 - Users: `GetUserByID`, `GetUsersByID`, `GetUsersByGroupID`, `GetUserByEmail`, `ListUsers` (`FetchAll`)
