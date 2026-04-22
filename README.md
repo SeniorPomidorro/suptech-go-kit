@@ -165,7 +165,7 @@ _ = raw
 
 ### `pkg/apis/atlassian`
 
-- Issues: `CreateIssue`, `GetIssue`, `UpdateIssue`, `SaveStoryPoints`, `FindIssues` (`FetchAll`), `ManageTags`, `CreateComment`, `AddAttachment`
+- Issues: `CreateIssue`, `GetIssue`, `UpdateIssue`, `SaveStoryPoints`, `FindIssues` (`FetchAll`), `ManageTags`, `CreateComment`, `AddAttachment`, `GetTransitions`, `DoTransition`
 - ADF helpers: `TextToADF`, `ADFToText`
 - Users: `FindUsers`, `BulkGetUsers`
 - Assets: `SearchObjectsAQL` (`FetchAll`), `CreateObject`, `DeleteObject`, `UpdateObject`, `GetObject`

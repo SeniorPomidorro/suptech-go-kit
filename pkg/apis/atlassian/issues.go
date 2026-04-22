@@ -221,6 +221,79 @@ func (s *IssuesService) UpdateIssue(ctx context.Context, ticketKey string, body 
 	return nil, s.client.doNoResponseBody(req)
 }
 
+// GetTransitions returns workflow transitions available on the issue.
+func (s *IssuesService) GetTransitions(ctx context.Context, ticketKey string, opts *GetTransitionsOptions) (*TransitionsList, error) {
+	if strings.TrimSpace(ticketKey) == "" {
+		return nil, errors.New("atlassian: ticket key is required")
+	}
+
+	var query url.Values
+	if opts != nil {
+		query = url.Values{}
+		if opts.Expand != "" {
+			query.Set("expand", opts.Expand)
+		}
+		if opts.TransitionID != "" {
+			query.Set("transitionId", opts.TransitionID)
+		}
+		if opts.SkipRemoteOnlyCondition {
+			query.Set("skipRemoteOnlyCondition", "true")
+		}
+		if opts.IncludeUnavailableTransitions {
+			query.Set("includeUnavailableTransitions", "true")
+		}
+		if opts.SortByOpsBarAndStatus {
+			query.Set("sortByOpsBarAndStatus", "true")
+		}
+	}
+
+	path := fmt.Sprintf("/rest/api/3/issue/%s/transitions", url.PathEscape(ticketKey))
+	req, err := s.client.newRequest(ctx, http.MethodGet, path, query, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var list TransitionsList
+	if err := s.client.transport.DoJSON(req, &list); err != nil {
+		return nil, err
+	}
+	return &list, nil
+}
+
+// DoTransition performs the requested workflow transition on the issue.
+func (s *IssuesService) DoTransition(ctx context.Context, ticketKey string, body *DoTransitionRequest) error {
+	if strings.TrimSpace(ticketKey) == "" {
+		return errors.New("atlassian: ticket key is required")
+	}
+	if body == nil || strings.TrimSpace(body.TransitionID) == "" {
+		return errors.New("atlassian: transition id is required")
+	}
+
+	payload := map[string]any{
+		"transition": map[string]string{"id": body.TransitionID},
+	}
+	if len(body.Fields) > 0 {
+		payload["fields"] = body.Fields
+	}
+	if len(body.Update) > 0 {
+		payload["update"] = body.Update
+	}
+	if len(body.Properties) > 0 {
+		payload["properties"] = body.Properties
+	}
+	if len(body.HistoryMetadata) > 0 {
+		payload["historyMetadata"] = body.HistoryMetadata
+	}
+
+	path := fmt.Sprintf("/rest/api/3/issue/%s/transitions", url.PathEscape(ticketKey))
+	req, err := s.client.newRequest(ctx, http.MethodPost, path, nil, payload)
+	if err != nil {
+		return err
+	}
+
+	return s.client.doNoResponseBody(req)
+}
+
 // ManageTags updates Jira labels via add/remove or full replace.
 func (s *IssuesService) ManageTags(ctx context.Context, ticketKey string, add, remove, replace []string) error {
 	if strings.TrimSpace(ticketKey) == "" {

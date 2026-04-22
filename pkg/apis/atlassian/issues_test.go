@@ -418,3 +418,101 @@ func TestUpdateIssueValidation(t *testing.T) {
 	}
 }
 
+func TestGetTransitions(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/rest/api/3/issue/ABC-1/transitions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("includeUnavailableTransitions"); got != "true" {
+			t.Fatalf("unexpected includeUnavailableTransitions: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"transitions":[{"id":"11","name":"Reopen","to":{"id":"5","name":"Reopened"},"isAvailable":true}]}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	list, err := client.Issues().GetTransitions(context.Background(), "ABC-1", &GetTransitionsOptions{
+		IncludeUnavailableTransitions: true,
+	})
+	if err != nil {
+		t.Fatalf("GetTransitions: %v", err)
+	}
+	if len(list.Transitions) != 1 || list.Transitions[0].ID != "11" || list.Transitions[0].To.Name != "Reopened" {
+		t.Fatalf("unexpected transitions: %+v", list.Transitions)
+	}
+}
+
+func TestDoTransition(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if r.URL.Path != "/rest/api/3/issue/ABC-1/transitions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
+		}
+		transition, ok := payload["transition"].(map[string]any)
+		if !ok {
+			t.Fatalf("transition block is required")
+		}
+		if id, _ := transition["id"].(string); id != "31" {
+			t.Fatalf("unexpected transition id: %q", id)
+		}
+		if _, ok := payload["fields"].(map[string]any); !ok {
+			t.Fatalf("fields block is required")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	err = client.Issues().DoTransition(context.Background(), "ABC-1", &DoTransitionRequest{
+		TransitionID: "31",
+		Fields:       map[string]any{"resolution": map[string]string{"name": "Done"}},
+	})
+	if err != nil {
+		t.Fatalf("DoTransition: %v", err)
+	}
+}
+
+func TestTransitionsValidation(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(WithBaseURL("https://example.com"), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	if _, err := client.Issues().GetTransitions(context.Background(), "", nil); err == nil {
+		t.Fatalf("expected error for empty ticket key")
+	}
+	if err := client.Issues().DoTransition(context.Background(), "", &DoTransitionRequest{TransitionID: "1"}); err == nil {
+		t.Fatalf("expected error for empty ticket key")
+	}
+	if err := client.Issues().DoTransition(context.Background(), "PROJ-1", nil); err == nil {
+		t.Fatalf("expected error for nil body")
+	}
+	if err := client.Issues().DoTransition(context.Background(), "PROJ-1", &DoTransitionRequest{}); err == nil {
+		t.Fatalf("expected error for empty transition id")
+	}
+}
+
