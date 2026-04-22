@@ -265,7 +265,10 @@ func (s *IssuesService) DoTransition(ctx context.Context, ticketKey string, body
 	if strings.TrimSpace(ticketKey) == "" {
 		return errors.New("atlassian: ticket key is required")
 	}
-	if body == nil || strings.TrimSpace(body.TransitionID) == "" {
+	if body == nil {
+		return errors.New("atlassian: transition request body is required")
+	}
+	if strings.TrimSpace(body.TransitionID) == "" {
 		return errors.New("atlassian: transition id is required")
 	}
 
