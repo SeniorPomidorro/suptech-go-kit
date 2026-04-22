@@ -96,3 +96,46 @@ type UpdateIssueOptions struct {
 	ReturnIssue            bool
 	Expand                 string
 }
+
+// TransitionStatus describes the target status of a transition.
+type TransitionStatus struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
+// Transition describes an available workflow transition on an issue.
+type Transition struct {
+	ID            string           `json:"id"`
+	Name          string           `json:"name,omitempty"`
+	To            TransitionStatus `json:"to,omitempty"`
+	HasScreen     bool             `json:"hasScreen,omitempty"`
+	IsGlobal      bool             `json:"isGlobal,omitempty"`
+	IsInitial     bool             `json:"isInitial,omitempty"`
+	IsAvailable   bool             `json:"isAvailable,omitempty"`
+	IsConditional bool             `json:"isConditional,omitempty"`
+	Looped        bool             `json:"looped,omitempty"`
+}
+
+// TransitionsList is the response of GET /rest/api/3/issue/{issueIdOrKey}/transitions.
+type TransitionsList struct {
+	Expand      string       `json:"expand,omitempty"`
+	Transitions []Transition `json:"transitions"`
+}
+
+// GetTransitionsOptions controls query parameters for listing transitions.
+type GetTransitionsOptions struct {
+	Expand                        string
+	TransitionID                  string
+	SkipRemoteOnlyCondition       bool
+	IncludeUnavailableTransitions bool
+	SortByOpsBarAndStatus         bool
+}
+
+// DoTransitionRequest is the payload for POST /rest/api/3/issue/{issueIdOrKey}/transitions.
+type DoTransitionRequest struct {
+	TransitionID    string           `json:"-"`
+	Fields          map[string]any   `json:"fields,omitempty"`
+	Update          map[string][]any `json:"update,omitempty"`
+	Properties      []map[string]any `json:"properties,omitempty"`
+	HistoryMetadata map[string]any   `json:"historyMetadata,omitempty"`
+}
