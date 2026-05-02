@@ -195,6 +195,37 @@ func (s *MeetingsService) Delete(ctx context.Context, meetingID int64) error {
 	return s.client.doJSON(ctx, http.MethodDelete, path, nil, nil, nil)
 }
 
+// MeetingStatusAction values accepted by UpdateStatus.
+const (
+	MeetingStatusActionEnd     = "end"     // force-end a live meeting (preserves cloud recording)
+	MeetingStatusActionRecover = "recover" // restore a recently deleted meeting
+)
+
+type updateStatusRequest struct {
+	Action string `json:"action"`
+}
+
+// UpdateStatus drives meeting state transitions: ending a live meeting
+// (action=end, like the host clicking "End meeting for all") or recovering a
+// recently deleted one (action=recover). Use the MeetingStatusAction* constants.
+//
+// Ending preserves the cloud recording — Zoom finalizes it and runs the
+// usual processing pipeline. Use this rather than Delete when you still want
+// the recording.
+//
+// Endpoint: PUT /meetings/{meetingId}/status.
+// Required scope (granular): meeting:update:status:admin.
+func (s *MeetingsService) UpdateStatus(ctx context.Context, meetingID int64, action string) error {
+	path := fmt.Sprintf("/meetings/%d/status", meetingID)
+	return s.client.doJSON(ctx, http.MethodPut, path, nil, &updateStatusRequest{Action: action}, nil)
+}
+
+// End is sugar for UpdateStatus with action=end. The meeting ends shortly
+// after this call returns; observe the transition by polling GetPast.
+func (s *MeetingsService) End(ctx context.Context, meetingID int64) error {
+	return s.UpdateStatus(ctx, meetingID, MeetingStatusActionEnd)
+}
+
 // ListByUser returns meetings owned by a user, optionally filtered by state.
 // Use opts.Type = MeetingListTypeLive to check whether a host currently has an
 // active meeting — that's how we pick a free host from the pool without storing
