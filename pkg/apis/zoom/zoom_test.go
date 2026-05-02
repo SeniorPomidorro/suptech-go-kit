@@ -270,6 +270,36 @@ func TestClient_DoesNotRetryAfterSecond401(t *testing.T) {
 	}
 }
 
+func TestMeetings_EndPostsActionEnd(t *testing.T) {
+	t.Parallel()
+	c, env := newTestEnv(t, true)
+
+	var (
+		gotMethod string
+		gotPath   string
+		gotBody   []byte
+	)
+	env.apiHandler = func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusNoContent)
+	}
+
+	if err := c.Meetings().End(context.Background(), 12345); err != nil {
+		t.Fatalf("End: %v", err)
+	}
+	if gotMethod != http.MethodPut {
+		t.Errorf("method: want PUT, got %s", gotMethod)
+	}
+	if gotPath != "/meetings/12345/status" {
+		t.Errorf("path: want /meetings/12345/status, got %s", gotPath)
+	}
+	if !strings.Contains(string(gotBody), `"action":"end"`) {
+		t.Errorf("body: want action=end, got %s", string(gotBody))
+	}
+}
+
 func TestErrors_HelpersOnNonZoomError(t *testing.T) {
 	t.Parallel()
 	if IsInvalidToken(nil) || IsMissingScope(nil) {
