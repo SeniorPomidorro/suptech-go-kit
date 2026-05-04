@@ -114,6 +114,64 @@ type Transition struct {
 	IsAvailable   bool             `json:"isAvailable,omitempty"`
 	IsConditional bool             `json:"isConditional,omitempty"`
 	Looped        bool             `json:"looped,omitempty"`
+
+	// Fields is populated only when GetTransitions is invoked with
+	// GetTransitionsOptions.Expand containing "transitions.fields". Map key is
+	// the Jira field key (system name like "summary" or custom field id like
+	// "customfield_12345"). Use it to render a transition screen UI and to
+	// build the payload for DoTransition.
+	Fields map[string]FieldMetadata `json:"fields,omitempty"`
+}
+
+// FieldMetadata describes one editable field on a transition or create screen.
+// Returned only when GetTransitions is invoked with Expand="transitions.fields"
+// or by createMeta endpoints. Mirrors the Jira Cloud OpenAPI schema FieldMetadata.
+type FieldMetadata struct {
+	Required        bool                `json:"required"`
+	Name            string              `json:"name,omitempty"`
+	Key             string              `json:"key,omitempty"`
+	Operations      []string            `json:"operations,omitempty"`
+	Schema          FieldMetadataSchema `json:"schema,omitempty"`
+	AllowedValues   []AllowedValue      `json:"allowedValues,omitempty"`
+	HasDefaultValue bool                `json:"hasDefaultValue,omitempty"`
+	DefaultValue    json.RawMessage     `json:"defaultValue,omitempty"`
+	AutoCompleteURL string              `json:"autoCompleteUrl,omitempty"`
+}
+
+// FieldMetadataSchema describes a field's data type. Mirrors the Jira Cloud
+// OpenAPI schema JsonTypeBean (renamed for Go readability).
+type FieldMetadataSchema struct {
+	// Type is the data type of the field, e.g. "string", "number", "date",
+	// "datetime", "option", "priority", "user", "array".
+	Type string `json:"type,omitempty"`
+	// Items names the element type when Type=="array".
+	Items string `json:"items,omitempty"`
+	// System is the system field name for built-in fields (e.g. "summary",
+	// "description", "priority", "assignee").
+	System string `json:"system,omitempty"`
+	// Custom is the URI of the custom field type.
+	Custom string `json:"custom,omitempty"`
+	// CustomID is the numeric id of the custom field, e.g. 12345 for
+	// customfield_12345.
+	CustomID int64 `json:"customId,omitempty"`
+}
+
+// AllowedValue is a single value that the field accepts. The Jira API uses a
+// shared array shape for allowedValues across many field types, with each
+// type populating a different subset of properties:
+//   - option / resolution / version / component: ID + Name (some option fields use Value)
+//   - priority: ID + Name
+//   - user: AccountID + DisplayName + (optional) EmailAddress
+//   - group: Name + (optional) GroupID
+type AllowedValue struct {
+	ID           string `json:"id,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Value        string `json:"value,omitempty"`
+	Description  string `json:"description,omitempty"`
+	AccountID    string `json:"accountId,omitempty"`
+	DisplayName  string `json:"displayName,omitempty"`
+	EmailAddress string `json:"emailAddress,omitempty"`
+	GroupID      string `json:"groupId,omitempty"`
 }
 
 // TransitionsList is the response of GET /rest/api/3/issue/{issueIdOrKey}/transitions.
