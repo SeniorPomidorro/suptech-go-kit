@@ -3,6 +3,18 @@ package atlassian
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+)
+
+// cmdbAssetCustomPrefix marks Atlassian Cloud Assets (formerly Insight) custom
+// fields. Used by FieldMetadataSchema.IsAsset to distinguish asset references
+// from generic string/array<string> fields. Both the modern Atlassian-owned
+// plugin and the legacy RIADA Insight plugin emit custom URIs starting with
+// "com.atlassian.jira.plugins.cmdb" or "com.riadalabs.jira.plugins.insight".
+const (
+	cmdbAssetCustomPrefix    = "com.atlassian.jira.plugins.cmdb"
+	insightAssetCustomPrefix = "com.riadalabs.jira.plugins.insight"
+	cmdbObjectFieldItemType  = "cmdb-object-field"
 )
 
 // FieldKind classifies a Jira field's data shape into a small set of
@@ -42,12 +54,39 @@ const (
 	FieldKindMultiUser
 	// FieldKindArrayOfStrings is a free-form array of strings (labels-style).
 	FieldKindArrayOfStrings
+	// FieldKindAsset is a single Atlassian Cloud Assets / Insight CMDB
+	// reference. Values are exchanged as {"workspaceId":..., "id":...} objects.
+	FieldKindAsset
+	// FieldKindMultiAsset is an array of Atlassian Cloud Assets references.
+	FieldKindMultiAsset
 )
+
+// IsAsset reports whether the field is an Atlassian Cloud Assets / Insight
+// CMDB reference. Asset fields require special handling on the wire (their
+// values are {workspaceId, id} objects, not plain strings or option refs)
+// and must be detected before the generic string/array branches in Kind.
+func (s FieldMetadataSchema) IsAsset() bool {
+	if s.Items == cmdbObjectFieldItemType {
+		return true
+	}
+	return strings.HasPrefix(s.Custom, cmdbAssetCustomPrefix) ||
+		strings.HasPrefix(s.Custom, insightAssetCustomPrefix)
+}
 
 // Kind classifies the schema for UI mapping. Returns FieldKindUnknown for
 // types we don't have a canonical UI shape for; callers typically render a
 // fallback link to Jira in that case.
 func (s FieldMetadataSchema) Kind() FieldKind {
+	// Asset detection happens before the generic switch because CMDB fields
+	// use the same surface schema (`type:array, items:string` or plain
+	// `type:string`) as labels/text — only `Custom`/`Items` give them away.
+	if s.IsAsset() {
+		if s.Type == "array" {
+			return FieldKindMultiAsset
+		}
+		return FieldKindAsset
+	}
+
 	switch s.Type {
 	case "string":
 		// description/environment are multi-line text; everything else is single-line.

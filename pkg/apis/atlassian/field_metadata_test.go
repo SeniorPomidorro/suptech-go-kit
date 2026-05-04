@@ -31,6 +31,30 @@ func TestFieldMetadataSchemaKind(t *testing.T) {
 		{"array<string>", FieldMetadataSchema{Type: "array", Items: "string"}, FieldKindArrayOfStrings},
 		{"array<unknown>", FieldMetadataSchema{Type: "array", Items: "issuelinks"}, FieldKindUnknown},
 		{"unknown-type", FieldMetadataSchema{Type: "team"}, FieldKindUnknown},
+		// Atlassian Cloud Assets — multi (the common case in modern Jira).
+		// Detected by items=="cmdb-object-field" regardless of array shape.
+		{"cmdb-multi-by-items", FieldMetadataSchema{
+			Type:   "array",
+			Items:  cmdbObjectFieldItemType,
+			Custom: "com.atlassian.jira.plugins.cmdb:cmdb-object-cftype",
+		}, FieldKindMultiAsset},
+		// Same field type, detected purely from Custom prefix when Items is
+		// missing — paranoia path for older API responses.
+		{"cmdb-multi-by-custom", FieldMetadataSchema{
+			Type:   "array",
+			Custom: "com.atlassian.jira.plugins.cmdb:cmdb-object-cftype",
+		}, FieldKindMultiAsset},
+		// Single-asset variant — same custom prefix, scalar type.
+		{"cmdb-single", FieldMetadataSchema{
+			Type:   "string",
+			Custom: "com.atlassian.jira.plugins.cmdb:cmdb-object-cftype",
+		}, FieldKindAsset},
+		// Legacy RIADA Insight plugin URI prefix — detected the same way.
+		{"insight-legacy", FieldMetadataSchema{
+			Type:   "array",
+			Items:  cmdbObjectFieldItemType,
+			Custom: "com.riadalabs.jira.plugins.insight:rlabs-insight-customfield-cmdb-cf",
+		}, FieldKindMultiAsset},
 	}
 	for _, tc := range cases {
 		tc := tc
