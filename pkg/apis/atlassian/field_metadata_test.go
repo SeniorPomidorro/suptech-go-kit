@@ -17,6 +17,14 @@ func TestFieldMetadataSchemaKind(t *testing.T) {
 		{"summary", FieldMetadataSchema{Type: "string", System: "summary"}, FieldKindString},
 		{"description→long-text", FieldMetadataSchema{Type: "string", System: "description"}, FieldKindLongText},
 		{"environment→long-text", FieldMetadataSchema{Type: "string", System: "environment"}, FieldKindLongText},
+		{"custom-textarea→long-text", FieldMetadataSchema{
+			Type:   "string",
+			Custom: "com.atlassian.jira.plugin.system.customfieldtypes:textarea",
+		}, FieldKindLongText},
+		{"custom-textfield→string", FieldMetadataSchema{
+			Type:   "string",
+			Custom: "com.atlassian.jira.plugin.system.customfieldtypes:textfield",
+		}, FieldKindString},
 		{"number", FieldMetadataSchema{Type: "number"}, FieldKindNumber},
 		{"date", FieldMetadataSchema{Type: "date"}, FieldKindDate},
 		{"datetime", FieldMetadataSchema{Type: "datetime"}, FieldKindDateTime},

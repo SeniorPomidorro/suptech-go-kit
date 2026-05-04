@@ -15,6 +15,12 @@ const (
 	cmdbAssetCustomPrefix    = "com.atlassian.jira.plugins.cmdb"
 	insightAssetCustomPrefix = "com.riadalabs.jira.plugins.insight"
 	cmdbObjectFieldItemType  = "cmdb-object-field"
+
+	// textareaCustomType marks a Jira custom string field rendered as a
+	// multi-line textarea in the UI. Without this marker, a plain
+	// schema.type="string" looks identical to a single-line text field —
+	// the only difference is the custom URI.
+	textareaCustomType = "com.atlassian.jira.plugin.system.customfieldtypes:textarea"
 )
 
 // FieldKind classifies a Jira field's data shape into a small set of
@@ -89,8 +95,10 @@ func (s FieldMetadataSchema) Kind() FieldKind {
 
 	switch s.Type {
 	case "string":
-		// description/environment are multi-line text; everything else is single-line.
-		if s.System == "description" || s.System == "environment" {
+		// description/environment are multi-line by virtue of being system
+		// fields with that semantic; custom textarea fields are marked
+		// explicitly via Custom URI. Everything else stays single-line.
+		if s.System == "description" || s.System == "environment" || s.Custom == textareaCustomType {
 			return FieldKindLongText
 		}
 		return FieldKindString
