@@ -106,7 +106,7 @@ func (s FieldMetadataSchema) Kind() FieldKind {
 		return FieldKindUser
 	case "array":
 		switch s.Items {
-		case "option", "version", "component":
+		case "option", "version", "component", "resolution", "priority", "issuetype":
 			return FieldKindMultiOption
 		case "user":
 			return FieldKindMultiUser
@@ -175,6 +175,41 @@ func (av AllowedValue) JiraPayload() map[string]any {
 		return map[string]any{"groupId": av.GroupID}
 	}
 	return nil
+}
+
+// OptionPair is a UI-friendly view over a single AllowedValue: Label is the
+// most human-readable text the value carries, Value is the most stable
+// identifier suitable for round-tripping (UIIdentifier).
+type OptionPair struct {
+	Label string
+	Value string
+}
+
+// OptionPairs returns one OptionPair per AllowedValue, picking the most
+// human-readable label (Name → Value → DisplayName) and the most stable
+// identifier (UIIdentifier). Entries that would yield an empty label or
+// value are skipped.
+//
+// Useful for populating select-style UI controls (HTML <select>, Slack
+// static_select, web forms) without each consumer re-implementing the
+// same fallback chain.
+func (m FieldMetadata) OptionPairs() []OptionPair {
+	out := make([]OptionPair, 0, len(m.AllowedValues))
+	for _, av := range m.AllowedValues {
+		label := av.Name
+		if label == "" {
+			label = av.Value
+		}
+		if label == "" {
+			label = av.DisplayName
+		}
+		value := av.UIIdentifier()
+		if label == "" || value == "" {
+			continue
+		}
+		out = append(out, OptionPair{Label: label, Value: value})
+	}
+	return out
 }
 
 // FindAllowedValue returns the first AllowedValue whose ID, Value, Name, or
@@ -302,6 +337,87 @@ func ParseStringArray(raw any) []string {
 		if s, ok := item.(string); ok {
 			out = append(out, s)
 		}
+	}
+	return out
+}
+
+// AssetReference is the {workspaceId, id, objectId} envelope Jira returns
+// for Atlassian Cloud Assets / Insight CMDB field values inside issue.fields.
+//
+//   - WorkspaceID is the assets-workspace UUID this object belongs to.
+//   - ID is the composite "<workspaceId>:<objectId>" used by the Jira REST
+//     API as the canonical reference shape.
+//   - ObjectID is the workspace-local numeric identifier of the object.
+type AssetReference struct {
+	WorkspaceID string `json:"workspaceId,omitempty"`
+	ID          string `json:"id,omitempty"`
+	ObjectID    string `json:"objectId,omitempty"`
+}
+
+// ParseAssetReferences extracts Atlassian Cloud Assets references from a
+// raw issue.fields value (typically the result of decoding the Jira issue
+// JSON into map[string]any). Handles both observed shapes:
+//
+//   - [{workspaceId, id, objectId}] — the modern, full envelope returned by
+//     the issue endpoint.
+//   - [{id="<workspaceId>:<objectId>"}] — the slimmer shape returned by some
+//     autocomplete responses; ObjectID is recovered from the suffix of ID
+//     and WorkspaceID from the prefix when both halves are present.
+//
+// Items that don't match either shape are skipped silently — most callers
+// only need the matched subset for prefilling a UI control.
+func ParseAssetReferences(raw any) []AssetReference {
+	arr, ok := raw.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]AssetReference, 0, len(arr))
+	for _, item := range arr {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		ref := AssetReference{}
+		if v, ok := obj["workspaceId"].(string); ok {
+			ref.WorkspaceID = v
+		}
+		if v, ok := obj["id"].(string); ok {
+			ref.ID = v
+		}
+		if v, ok := obj["objectId"].(string); ok {
+			ref.ObjectID = v
+		}
+		// Recover objectId/workspaceId from the composite "ws:obj" id when
+		// the shorter shape is in play.
+		if ref.ObjectID == "" && ref.ID != "" {
+			if idx := strings.LastIndex(ref.ID, ":"); idx >= 0 && idx+1 < len(ref.ID) {
+				ref.ObjectID = ref.ID[idx+1:]
+				if ref.WorkspaceID == "" {
+					ref.WorkspaceID = ref.ID[:idx]
+				}
+			} else {
+				ref.ObjectID = ref.ID
+			}
+		}
+		if ref.ObjectID == "" {
+			continue
+		}
+		out = append(out, ref)
+	}
+	return out
+}
+
+// ParseAssetObjectIDs is a convenience around ParseAssetReferences that
+// returns only the object ids — the most common form needed for prefilling
+// a free-text UI input.
+func ParseAssetObjectIDs(raw any) []string {
+	refs := ParseAssetReferences(raw)
+	if len(refs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(refs))
+	for _, r := range refs {
+		out = append(out, r.ObjectID)
 	}
 	return out
 }

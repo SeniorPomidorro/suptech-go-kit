@@ -27,6 +27,10 @@ func TestFieldMetadataSchemaKind(t *testing.T) {
 		{"user", FieldMetadataSchema{Type: "user", System: "assignee"}, FieldKindUser},
 		{"array<option>", FieldMetadataSchema{Type: "array", Items: "option"}, FieldKindMultiOption},
 		{"array<version>", FieldMetadataSchema{Type: "array", Items: "version"}, FieldKindMultiOption},
+		{"array<component>", FieldMetadataSchema{Type: "array", Items: "component"}, FieldKindMultiOption},
+		{"array<resolution>", FieldMetadataSchema{Type: "array", Items: "resolution"}, FieldKindMultiOption},
+		{"array<priority>", FieldMetadataSchema{Type: "array", Items: "priority"}, FieldKindMultiOption},
+		{"array<issuetype>", FieldMetadataSchema{Type: "array", Items: "issuetype"}, FieldKindMultiOption},
 		{"array<user>", FieldMetadataSchema{Type: "array", Items: "user"}, FieldKindMultiUser},
 		{"array<string>", FieldMetadataSchema{Type: "array", Items: "string"}, FieldKindArrayOfStrings},
 		{"array<unknown>", FieldMetadataSchema{Type: "array", Items: "issuelinks"}, FieldKindUnknown},
@@ -116,6 +120,32 @@ func TestAllowedValueJiraPayload(t *testing.T) {
 				t.Fatalf("JiraPayload() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestFieldMetadataOptionPairs(t *testing.T) {
+	t.Parallel()
+
+	meta := FieldMetadata{
+		AllowedValues: []AllowedValue{
+			{ID: "1", Name: "Highest"},
+			{ID: "10100", Value: "billing"}, // option without Name → Value as label
+			{AccountID: "u1", DisplayName: "Alice"},
+			{Name: "name-only"}, // Name is both label and UIIdentifier fallback
+			{ID: "x"},           // missing label → skipped
+			{},                  // empty → skipped
+		},
+	}
+
+	got := meta.OptionPairs()
+	want := []OptionPair{
+		{Label: "Highest", Value: "1"},
+		{Label: "billing", Value: "10100"},
+		{Label: "Alice", Value: "u1"},
+		{Label: "name-only", Value: "name-only"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("OptionPairs() = %+v, want %+v", got, want)
 	}
 }
 
@@ -280,6 +310,88 @@ func TestParseDateValue(t *testing.T) {
 		if got := ParseDateValue(tc.in); got != tc.want {
 			t.Fatalf("ParseDateValue(%v) = %q, want %q", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestParseAssetReferences(t *testing.T) {
+	t.Parallel()
+
+	// Modern shape — full envelope as returned by the issue endpoint.
+	full := []any{
+		map[string]any{
+			"workspaceId": "ws-1",
+			"id":          "ws-1:3212",
+			"objectId":    "3212",
+		},
+		map[string]any{
+			"workspaceId": "ws-1",
+			"id":          "ws-1:4040",
+			"objectId":    "4040",
+		},
+	}
+	refs := ParseAssetReferences(full)
+	if !reflect.DeepEqual(refs, []AssetReference{
+		{WorkspaceID: "ws-1", ID: "ws-1:3212", ObjectID: "3212"},
+		{WorkspaceID: "ws-1", ID: "ws-1:4040", ObjectID: "4040"},
+	}) {
+		t.Fatalf("full: %+v", refs)
+	}
+
+	// Slim shape — only id="<ws>:<obj>" present; objectId+workspaceId are
+	// recovered from the composite.
+	slim := []any{
+		map[string]any{"id": "ws-2:9001"},
+	}
+	refs = ParseAssetReferences(slim)
+	if !reflect.DeepEqual(refs, []AssetReference{
+		{WorkspaceID: "ws-2", ID: "ws-2:9001", ObjectID: "9001"},
+	}) {
+		t.Fatalf("slim: %+v", refs)
+	}
+
+	// id without colon — treated as raw object id; workspaceId left empty.
+	noColon := []any{
+		map[string]any{"id": "12345"},
+	}
+	refs = ParseAssetReferences(noColon)
+	if !reflect.DeepEqual(refs, []AssetReference{
+		{ID: "12345", ObjectID: "12345"},
+	}) {
+		t.Fatalf("noColon: %+v", refs)
+	}
+
+	// Skip items that don't yield an objectId at all (no id, no objectId).
+	junk := []any{
+		map[string]any{"workspaceId": "ws-3"},
+		map[string]any{"id": "3212", "objectId": "3212"},
+	}
+	refs = ParseAssetReferences(junk)
+	if len(refs) != 1 || refs[0].ObjectID != "3212" {
+		t.Fatalf("skip junk: %+v", refs)
+	}
+
+	// Non-array inputs return nil.
+	if got := ParseAssetReferences(nil); got != nil {
+		t.Fatalf("nil: %+v", got)
+	}
+	if got := ParseAssetReferences("oops"); got != nil {
+		t.Fatalf("string: %+v", got)
+	}
+}
+
+func TestParseAssetObjectIDs(t *testing.T) {
+	t.Parallel()
+
+	got := ParseAssetObjectIDs([]any{
+		map[string]any{"workspaceId": "ws", "id": "ws:1", "objectId": "1"},
+		map[string]any{"id": "ws:2"},
+	})
+	if !reflect.DeepEqual(got, []string{"1", "2"}) {
+		t.Fatalf("ids: %+v", got)
+	}
+
+	if got := ParseAssetObjectIDs([]any{}); got != nil {
+		t.Fatalf("empty array: %+v", got)
 	}
 }
 
