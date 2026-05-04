@@ -450,6 +450,140 @@ func TestGetTransitions(t *testing.T) {
 	if len(list.Transitions) != 1 || list.Transitions[0].ID != "11" || list.Transitions[0].To.Name != "Reopened" {
 		t.Fatalf("unexpected transitions: %+v", list.Transitions)
 	}
+	// Without Expand="transitions.fields" the upstream omits per-field
+	// metadata; the parser must keep Fields nil so callers can rely on
+	// `len(Fields)==0` to gate UI rendering of transition screens.
+	if got := list.Transitions[0].Fields; got != nil {
+		t.Fatalf("expected Fields to be nil without expand, got: %+v", got)
+	}
+}
+
+func TestGetTransitionsExpandsFields(t *testing.T) {
+	t.Parallel()
+
+	const respBody = `{
+		"expand": "transitions",
+		"transitions": [
+			{
+				"id": "91",
+				"name": "Identified as an Incident",
+				"to": {"id": "10482", "name": "Active"},
+				"hasScreen": true,
+				"isAvailable": true,
+				"fields": {
+					"summary": {
+						"required": true,
+						"name": "Summary",
+						"key": "summary",
+						"operations": ["set"],
+						"schema": {"type": "string", "system": "summary"},
+						"hasDefaultValue": false
+					},
+					"priority": {
+						"required": true,
+						"name": "Priority",
+						"key": "priority",
+						"operations": ["set"],
+						"schema": {"type": "priority", "system": "priority"},
+						"allowedValues": [
+							{"id": "1", "name": "Highest"},
+							{"id": "3", "name": "Medium"}
+						]
+					},
+					"assignee": {
+						"required": false,
+						"name": "Assignee",
+						"key": "assignee",
+						"operations": ["set"],
+						"schema": {"type": "user", "system": "assignee"},
+						"autoCompleteUrl": "https://x.atlassian.net/rest/api/2/user/assignable/search?issueKey=ABC-1&username="
+					},
+					"customfield_10090": {
+						"required": true,
+						"name": "Affected services",
+						"key": "customfield_10090",
+						"operations": ["add", "set", "remove"],
+						"schema": {
+							"type": "array",
+							"items": "option",
+							"custom": "com.atlassian.jira.plugin.system.customfieldtypes:multiselect",
+							"customId": 10090
+						},
+						"allowedValues": [
+							{"id": "10100", "value": "billing"},
+							{"id": "10101", "value": "checkout"}
+						]
+					}
+				}
+			}
+		]
+	}`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("expand"); got != "transitions.fields" {
+			t.Fatalf("unexpected expand: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(respBody))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	list, err := client.Issues().GetTransitions(context.Background(), "ABC-1", &GetTransitionsOptions{
+		Expand: "transitions.fields",
+	})
+	if err != nil {
+		t.Fatalf("GetTransitions: %v", err)
+	}
+	if len(list.Transitions) != 1 {
+		t.Fatalf("expected 1 transition, got %d", len(list.Transitions))
+	}
+	tr := list.Transitions[0]
+	if !tr.HasScreen {
+		t.Fatalf("expected HasScreen=true")
+	}
+	if len(tr.Fields) != 4 {
+		t.Fatalf("expected 4 fields, got %d: %+v", len(tr.Fields), tr.Fields)
+	}
+
+	summary, ok := tr.Fields["summary"]
+	if !ok {
+		t.Fatalf("missing summary field")
+	}
+	if !summary.Required || summary.Schema.Type != "string" || summary.Schema.System != "summary" {
+		t.Fatalf("unexpected summary field: %+v", summary)
+	}
+
+	priority := tr.Fields["priority"]
+	if priority.Schema.Type != "priority" || len(priority.AllowedValues) != 2 {
+		t.Fatalf("unexpected priority field: %+v", priority)
+	}
+	if priority.AllowedValues[0].ID != "1" || priority.AllowedValues[0].Name != "Highest" {
+		t.Fatalf("unexpected priority allowedValues: %+v", priority.AllowedValues)
+	}
+
+	assignee := tr.Fields["assignee"]
+	if assignee.Schema.Type != "user" || assignee.Required {
+		t.Fatalf("unexpected assignee field: %+v", assignee)
+	}
+	if assignee.AutoCompleteURL == "" {
+		t.Fatalf("expected autoCompleteUrl to be parsed for assignee")
+	}
+
+	multi := tr.Fields["customfield_10090"]
+	if multi.Schema.Type != "array" || multi.Schema.Items != "option" {
+		t.Fatalf("unexpected multiselect schema: %+v", multi.Schema)
+	}
+	if multi.Schema.CustomID != 10090 {
+		t.Fatalf("expected customId=10090, got %d", multi.Schema.CustomID)
+	}
+	if len(multi.AllowedValues) != 2 || multi.AllowedValues[0].Value != "billing" {
+		t.Fatalf("unexpected option allowedValues: %+v", multi.AllowedValues)
+	}
 }
 
 func TestDoTransition(t *testing.T) {

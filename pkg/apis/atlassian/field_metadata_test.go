@@ -1,0 +1,277 @@
+package atlassian
+
+import (
+	"encoding/json"
+	"reflect"
+	"testing"
+)
+
+func TestFieldMetadataSchemaKind(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		schema FieldMetadataSchema
+		want   FieldKind
+	}{
+		{"summary", FieldMetadataSchema{Type: "string", System: "summary"}, FieldKindString},
+		{"description→long-text", FieldMetadataSchema{Type: "string", System: "description"}, FieldKindLongText},
+		{"environment→long-text", FieldMetadataSchema{Type: "string", System: "environment"}, FieldKindLongText},
+		{"number", FieldMetadataSchema{Type: "number"}, FieldKindNumber},
+		{"date", FieldMetadataSchema{Type: "date"}, FieldKindDate},
+		{"datetime", FieldMetadataSchema{Type: "datetime"}, FieldKindDateTime},
+		{"option", FieldMetadataSchema{Type: "option"}, FieldKindOption},
+		{"priority", FieldMetadataSchema{Type: "priority", System: "priority"}, FieldKindOption},
+		{"resolution", FieldMetadataSchema{Type: "resolution", System: "resolution"}, FieldKindOption},
+		{"version", FieldMetadataSchema{Type: "version"}, FieldKindOption},
+		{"user", FieldMetadataSchema{Type: "user", System: "assignee"}, FieldKindUser},
+		{"array<option>", FieldMetadataSchema{Type: "array", Items: "option"}, FieldKindMultiOption},
+		{"array<version>", FieldMetadataSchema{Type: "array", Items: "version"}, FieldKindMultiOption},
+		{"array<user>", FieldMetadataSchema{Type: "array", Items: "user"}, FieldKindMultiUser},
+		{"array<string>", FieldMetadataSchema{Type: "array", Items: "string"}, FieldKindArrayOfStrings},
+		{"array<unknown>", FieldMetadataSchema{Type: "array", Items: "issuelinks"}, FieldKindUnknown},
+		{"unknown-type", FieldMetadataSchema{Type: "team"}, FieldKindUnknown},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tc.schema.Kind(); got != tc.want {
+				t.Fatalf("Kind() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAllowedValueUIIdentifier(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		av   AllowedValue
+		want string
+	}{
+		{"id-wins", AllowedValue{ID: "1", Value: "v", Name: "n"}, "1"},
+		{"value-fallback", AllowedValue{Value: "billing", Name: "Billing"}, "billing"},
+		{"name-fallback", AllowedValue{Name: "Highest"}, "Highest"},
+		{"account-id", AllowedValue{AccountID: "abc"}, "abc"},
+		{"group-id", AllowedValue{GroupID: "g-1"}, "g-1"},
+		{"empty", AllowedValue{}, ""},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tc.av.UIIdentifier(); got != tc.want {
+				t.Fatalf("UIIdentifier() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAllowedValueJiraPayload(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		av   AllowedValue
+		want map[string]any
+	}{
+		{"prefers-account-id", AllowedValue{AccountID: "abc", ID: "1", Name: "n"}, map[string]any{"accountId": "abc"}},
+		{"id-over-value", AllowedValue{ID: "10", Value: "billing", Name: "Billing"}, map[string]any{"id": "10"}},
+		{"value-when-no-id", AllowedValue{Value: "billing", Name: "Billing"}, map[string]any{"value": "billing"}},
+		{"name-only", AllowedValue{Name: "Highest"}, map[string]any{"name": "Highest"}},
+		{"group-id", AllowedValue{GroupID: "g-1"}, map[string]any{"groupId": "g-1"}},
+		{"empty", AllowedValue{}, nil},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tc.av.JiraPayload(); !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("JiraPayload() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFieldMetadataFindAllowedValue(t *testing.T) {
+	t.Parallel()
+
+	meta := FieldMetadata{
+		AllowedValues: []AllowedValue{
+			{ID: "1", Name: "Highest"},
+			{ID: "10100", Value: "billing"},
+			{AccountID: "u1", DisplayName: "Alice"},
+		},
+	}
+
+	if av, ok := meta.FindAllowedValue("1"); !ok || av.Name != "Highest" {
+		t.Fatalf("by id: got (%+v, %v)", av, ok)
+	}
+	if av, ok := meta.FindAllowedValue("billing"); !ok || av.ID != "10100" {
+		t.Fatalf("by value: got (%+v, %v)", av, ok)
+	}
+	if av, ok := meta.FindAllowedValue("Alice"); ok {
+		// DisplayName isn't part of the search keys — should not match.
+		t.Fatalf("display-name unexpectedly matched: %+v", av)
+	}
+	if av, ok := meta.FindAllowedValue("u1"); !ok || av.DisplayName != "Alice" {
+		t.Fatalf("by accountId: got (%+v, %v)", av, ok)
+	}
+	if _, ok := meta.FindAllowedValue(""); ok {
+		t.Fatalf("empty identifier should not match")
+	}
+	if _, ok := meta.FindAllowedValue("nope"); ok {
+		t.Fatalf("unknown identifier should not match")
+	}
+}
+
+func TestFieldMetadataMatchAllowedValue(t *testing.T) {
+	t.Parallel()
+
+	meta := FieldMetadata{
+		AllowedValues: []AllowedValue{
+			{ID: "1", Name: "Highest"},
+			{ID: "10100", Value: "billing"},
+			{AccountID: "u1", DisplayName: "Alice"},
+			{AccountID: "u2", DisplayName: "Bob", EmailAddress: "bob@example.com"},
+		},
+	}
+
+	// Priority: object with id+name.
+	if av, ok := meta.MatchAllowedValue(map[string]any{"id": "1", "name": "Highest"}); !ok || av.ID != "1" {
+		t.Fatalf("priority match: got (%+v, %v)", av, ok)
+	}
+	// Option: object with id+value.
+	if av, ok := meta.MatchAllowedValue(map[string]any{"id": "10100", "value": "billing"}); !ok || av.Value != "billing" {
+		t.Fatalf("option match: got (%+v, %v)", av, ok)
+	}
+	// Match by value when the id is missing.
+	if av, ok := meta.MatchAllowedValue(map[string]any{"value": "billing"}); !ok || av.ID != "10100" {
+		t.Fatalf("by value: got (%+v, %v)", av, ok)
+	}
+	// User-shaped raw: assignee/reporter come back from issue.fields as an
+	// object keyed by accountId+displayName+emailAddress. Match must hit on
+	// accountId — the most stable identifier across user renames.
+	if av, ok := meta.MatchAllowedValue(map[string]any{"accountId": "u1", "displayName": "Alice"}); !ok || av.DisplayName != "Alice" {
+		t.Fatalf("user match by accountId: got (%+v, %v)", av, ok)
+	}
+	// User-shaped raw with extra fields (emailAddress) should still match
+	// only on accountId — emailAddress is informational, not a key.
+	if av, ok := meta.MatchAllowedValue(map[string]any{"accountId": "u2", "displayName": "Bob", "emailAddress": "bob@example.com"}); !ok || av.AccountID != "u2" {
+		t.Fatalf("user match with email: got (%+v, %v)", av, ok)
+	}
+	// User without accountId in the raw payload — nothing to match against.
+	if _, ok := meta.MatchAllowedValue(map[string]any{"displayName": "Alice"}); ok {
+		t.Fatalf("displayName alone should not match")
+	}
+	// Nil.
+	if _, ok := meta.MatchAllowedValue(nil); ok {
+		t.Fatalf("nil should not match")
+	}
+	// Wrong shape.
+	if _, ok := meta.MatchAllowedValue("oops"); ok {
+		t.Fatalf("string should not match")
+	}
+	// No allowed value matches.
+	if _, ok := meta.MatchAllowedValue(map[string]any{"id": "999"}); ok {
+		t.Fatalf("unknown id should not match")
+	}
+}
+
+func TestFieldMetadataMatchAllowedValues(t *testing.T) {
+	t.Parallel()
+
+	meta := FieldMetadata{
+		AllowedValues: []AllowedValue{
+			{ID: "10100", Value: "billing"},
+			{ID: "10101", Value: "checkout"},
+		},
+	}
+
+	got := meta.MatchAllowedValues([]any{
+		map[string]any{"id": "10100", "value": "billing"},
+		map[string]any{"id": "99999"}, // unknown — skipped
+		map[string]any{"value": "checkout"},
+	})
+
+	if len(got) != 2 || got[0].Value != "billing" || got[1].Value != "checkout" {
+		t.Fatalf("unexpected matches: %+v", got)
+	}
+
+	if got := meta.MatchAllowedValues("not-an-array"); got != nil {
+		t.Fatalf("non-array input should return nil, got %+v", got)
+	}
+}
+
+func TestParseStringValue(t *testing.T) {
+	t.Parallel()
+
+	if got := ParseStringValue(nil); got != "" {
+		t.Fatalf("nil → %q", got)
+	}
+	if got := ParseStringValue("hello"); got != "hello" {
+		t.Fatalf("string: %q", got)
+	}
+	if got := ParseStringValue(float64(42)); got != "42" {
+		t.Fatalf("int-as-float64: %q", got)
+	}
+	if got := ParseStringValue(float64(3.5)); got != "3.5" {
+		t.Fatalf("real float: %q", got)
+	}
+	if got := ParseStringValue(true); got != "true" {
+		t.Fatalf("bool: %q", got)
+	}
+	// json.Number is what callers get when they decode with
+	// json.Decoder.UseNumber() — fairly common defensive setting for
+	// preserving precision. Make sure we don't drop into the default
+	// JSON-marshal branch.
+	if got := ParseStringValue(json.Number("123")); got != "123" {
+		t.Fatalf("json.Number int: %q", got)
+	}
+	if got := ParseStringValue(json.Number("3.14")); got != "3.14" {
+		t.Fatalf("json.Number float: %q", got)
+	}
+	// Object falls back to JSON.
+	if got := ParseStringValue(map[string]any{"k": "v"}); got != `{"k":"v"}` {
+		t.Fatalf("map: %q", got)
+	}
+}
+
+func TestParseDateValue(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		in   any
+		want string
+	}{
+		{nil, ""},
+		{"2026-05-04", "2026-05-04"},
+		{"2026-05-04T11:00:00.000+0400", "2026-05-04"},
+		{"not-a-date", ""},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := ParseDateValue(tc.in); got != tc.want {
+			t.Fatalf("ParseDateValue(%v) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestParseStringArray(t *testing.T) {
+	t.Parallel()
+
+	if got := ParseStringArray([]any{"a", "b", "c"}); !reflect.DeepEqual(got, []string{"a", "b", "c"}) {
+		t.Fatalf("plain: %+v", got)
+	}
+	if got := ParseStringArray([]any{"a", 1, "b"}); !reflect.DeepEqual(got, []string{"a", "b"}) {
+		t.Fatalf("mixed: %+v", got)
+	}
+	if got := ParseStringArray("oops"); got != nil {
+		t.Fatalf("non-array: %+v", got)
+	}
+	if got := ParseStringArray(nil); got != nil {
+		t.Fatalf("nil: %+v", got)
+	}
+}
