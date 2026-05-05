@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // cmdbAssetCustomPrefix marks Atlassian Cloud Assets (formerly Insight) custom
@@ -331,6 +332,55 @@ func ParseDateValue(raw any) string {
 		return s[:10]
 	}
 	return ""
+}
+
+// jiraDatetimeLayouts lists the ISO-8601 shapes we've seen Jira return for
+// datetime custom fields. Tried in order until one parses cleanly.
+//
+// "2006-01-02T15:04:05.000-0700" — most common: millisecond precision plus
+// numeric timezone offset without a colon (Jira's classic format).
+// time.RFC3339 / RFC3339Nano cover the colon-separated offset variants
+// some endpoints emit, plus the plain "Z" UTC marker.
+var jiraDatetimeLayouts = []string{
+	"2006-01-02T15:04:05.000-0700",
+	"2006-01-02T15:04:05-0700",
+	time.RFC3339Nano,
+	time.RFC3339,
+}
+
+// ParseDatetimeUnix decodes a Jira datetime value (issue.fields[<key>] or any
+// other ISO-8601 string Jira emits) into Unix seconds. Returns 0 when raw is
+// empty or doesn't match any known datetime shape — caller should treat 0 as
+// "no preset" rather than the actual epoch.
+func ParseDatetimeUnix(raw any) int64 {
+	s := strings.TrimSpace(ParseStringValue(raw))
+	if s == "" {
+		return 0
+	}
+	for _, layout := range jiraDatetimeLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.Unix()
+		}
+	}
+	return 0
+}
+
+// FormatDatetimeJira renders Unix seconds as a Jira-compatible ISO-8601
+// datetime string (millisecond precision, numeric offset). The output is the
+// shape Jira accepts for datetime fields in issue update / transition
+// payloads. Returns "" when unix is non-positive.
+//
+// Locale: the value is formatted in the local time zone of the current
+// process. Pass loc=nil for time.Local; otherwise specify e.g. time.UTC or
+// time.LoadLocation("Asia/Dubai").
+func FormatDatetimeJira(unix int64, loc *time.Location) string {
+	if unix <= 0 {
+		return ""
+	}
+	if loc == nil {
+		loc = time.Local
+	}
+	return time.Unix(unix, 0).In(loc).Format("2006-01-02T15:04:05.000-0700")
 }
 
 // ParseStringArray decodes an array-of-strings issue.fields value (such as

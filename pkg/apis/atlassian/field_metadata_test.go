@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestFieldMetadataSchemaKind(t *testing.T) {
@@ -400,6 +401,73 @@ func TestParseAssetObjectIDs(t *testing.T) {
 
 	if got := ParseAssetObjectIDs([]any{}); got != nil {
 		t.Fatalf("empty array: %+v", got)
+	}
+}
+
+func TestParseDatetimeUnix(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   any
+		want int64
+	}{
+		{"empty", "", 0},
+		{"nil", nil, 0},
+		{"unparseable", "not a date", 0},
+		{
+			"jira-classic-with-millis-and-offset",
+			"2026-05-04T11:00:00.000+0400",
+			time.Date(2026, 5, 4, 11, 0, 0, 0, time.FixedZone("+0400", 4*3600)).Unix(),
+		},
+		{
+			"rfc3339-utc",
+			"2026-05-04T11:00:00Z",
+			time.Date(2026, 5, 4, 11, 0, 0, 0, time.UTC).Unix(),
+		},
+		{
+			"rfc3339-with-colon-offset",
+			"2026-05-04T11:00:00+04:00",
+			time.Date(2026, 5, 4, 11, 0, 0, 0, time.FixedZone("+04:00", 4*3600)).Unix(),
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := ParseDatetimeUnix(tc.in); got != tc.want {
+				t.Fatalf("ParseDatetimeUnix(%v) = %d, want %d", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFormatDatetimeJira(t *testing.T) {
+	t.Parallel()
+
+	if got := FormatDatetimeJira(0, nil); got != "" {
+		t.Fatalf("zero unix: %q", got)
+	}
+	if got := FormatDatetimeJira(-1, nil); got != "" {
+		t.Fatalf("negative unix: %q", got)
+	}
+
+	utc, _ := time.LoadLocation("UTC")
+	got := FormatDatetimeJira(time.Date(2026, 5, 4, 11, 0, 0, 0, utc).Unix(), utc)
+	if got != "2026-05-04T11:00:00.000+0000" {
+		t.Fatalf("UTC format: %q", got)
+	}
+
+	// Round-trip the classic Jira shape: parse then format in the same zone
+	// should yield bit-equivalent output.
+	loc := time.FixedZone("+0400", 4*3600)
+	unix := ParseDatetimeUnix("2026-05-04T11:00:00.000+0400")
+	if unix == 0 {
+		t.Fatalf("parse failed before round-trip")
+	}
+	if got := FormatDatetimeJira(unix, loc); got != "2026-05-04T11:00:00.000+0400" {
+		t.Fatalf("round-trip: %q", got)
 	}
 }
 
