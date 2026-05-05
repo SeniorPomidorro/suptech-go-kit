@@ -370,15 +370,17 @@ func ParseDatetimeUnix(raw any) int64 {
 // shape Jira accepts for datetime fields in issue update / transition
 // payloads. Returns "" when unix is non-positive.
 //
-// Locale: the value is formatted in the local time zone of the current
-// process. Pass loc=nil for time.Local; otherwise specify e.g. time.UTC or
-// time.LoadLocation("Asia/Dubai").
+// Locale: when loc is nil the value is formatted in UTC. UTC is chosen
+// over time.Local on purpose — a library function shouldn't depend on the
+// host's TZ env, otherwise the same call produces different strings on
+// dev / staging / production. Pass an explicit *time.Location (e.g.
+// time.LoadLocation("Asia/Dubai")) to render in a specific zone.
 func FormatDatetimeJira(unix int64, loc *time.Location) string {
 	if unix <= 0 {
 		return ""
 	}
 	if loc == nil {
-		loc = time.Local
+		loc = time.UTC
 	}
 	return time.Unix(unix, 0).In(loc).Format("2006-01-02T15:04:05.000-0700")
 }

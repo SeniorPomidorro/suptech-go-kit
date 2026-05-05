@@ -459,6 +459,12 @@ func TestFormatDatetimeJira(t *testing.T) {
 		t.Fatalf("UTC format: %q", got)
 	}
 
+	// nil loc must default to UTC, not time.Local — otherwise output drifts
+	// across environments based on the host TZ.
+	if got := FormatDatetimeJira(time.Date(2026, 5, 4, 11, 0, 0, 0, utc).Unix(), nil); got != "2026-05-04T11:00:00.000+0000" {
+		t.Fatalf("nil loc should default to UTC, got %q", got)
+	}
+
 	// Round-trip the classic Jira shape: parse then format in the same zone
 	// should yield bit-equivalent output.
 	loc := time.FixedZone("+0400", 4*3600)
