@@ -75,6 +75,23 @@ func TestDatepicker(t *testing.T) {
 	}
 }
 
+func TestDatetimepicker(t *testing.T) {
+	t.Parallel()
+
+	bare := Datetimepicker("a", 0)
+	if bare["type"] != "datetimepicker" || bare["action_id"] != "a" {
+		t.Fatalf("base: %+v", bare)
+	}
+	if _, ok := bare["initial_date_time"]; ok {
+		t.Fatalf("zero initialUnix should not be emitted")
+	}
+
+	full := Datetimepicker("a", 1714838400)
+	if full["initial_date_time"] != int64(1714838400) {
+		t.Fatalf("initial_date_time: %v (%T)", full["initial_date_time"], full["initial_date_time"])
+	}
+}
+
 func TestStaticSelectInitialOption(t *testing.T) {
 	t.Parallel()
 

@@ -78,6 +78,21 @@ func Datepicker(actionID, initialDate string) map[string]any {
 	return el
 }
 
+// Datetimepicker builds a datetimepicker element — a single combined date+time
+// control. initialUnix is the preset moment in Unix seconds; pass 0 to leave
+// it unset. The user's selection arrives back on view.state.values via
+// SelectedDateTime (Unix seconds), regardless of the user's timezone.
+func Datetimepicker(actionID string, initialUnix int64) map[string]any {
+	el := map[string]any{
+		"type":      "datetimepicker",
+		"action_id": actionID,
+	}
+	if initialUnix > 0 {
+		el["initial_date_time"] = initialUnix
+	}
+	return el
+}
+
 // StaticSelect builds a static_select element. options should come from
 // Option(); initialValue selects the option whose value matches.
 func StaticSelect(actionID, placeholder string, options []map[string]any, initialValue string) map[string]any {
