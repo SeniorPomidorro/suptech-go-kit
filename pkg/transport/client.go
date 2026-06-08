@@ -31,8 +31,18 @@ type RetryConfig struct {
 	// (http.Client.Timeout firing while a request is in flight). It is off by
 	// default: a timeout is ambiguous for non-idempotent requests because the
 	// server may have already processed the request before the client gave up,
-	// so a blind retry can duplicate side effects. Enable it only for clients
-	// that issue idempotent requests (e.g. read-only GETs).
+	// so a blind retry can duplicate side effects.
+	//
+	// The flag is per-Client and applies to every replayable request the client
+	// makes — including POSTs/PATCHes with a body, since http.NewRequest sets
+	// GetBody for the standard *bytes.Reader/*strings.Reader/*bytes.Buffer
+	// bodies, which makes them replayable. Enable it only on a client dedicated
+	// to idempotent requests (e.g. read-only GETs); do not enable it on a client
+	// shared with non-idempotent writes.
+	//
+	// It only governs timeouts that surface as context.DeadlineExceeded. Lower
+	// level i/o timeouts that present as a bare net.Error are retried as
+	// transient network errors regardless of this flag (pre-existing behavior).
 	//
 	// This never overrides caller cancellation: if the context passed to Do is
 	// itself done, the request is not retried regardless of this flag.

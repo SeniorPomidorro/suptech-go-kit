@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -229,5 +230,46 @@ func TestDoDoesNotRetryCallerDeadlineEvenWhenTimeoutRetryEnabled(t *testing.T) {
 	}
 	if got := hits(); got != 1 {
 		t.Fatalf("expected exactly 1 attempt (caller deadline, no retry), got %d", got)
+	}
+}
+
+// TestShouldRetryErrorClassification pins the full truth table of the retry
+// decision at the unit level. It is the only coverage of the branch that
+// actually exercises the ctx.Err() guard: a cancelled caller context paired
+// with a generic, retryable net.Error must NOT be retried. The Do-level tests
+// above cannot defend that guard — their errors are context.DeadlineExceeded,
+// which sleepWithContext would also bail on, so they stay green even if the
+// guard is deleted.
+func TestShouldRetryErrorClassification(t *testing.T) {
+	t.Parallel()
+
+	netErr := &net.OpError{Op: "read", Err: errors.New("connection reset by peer")}
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+	alive := context.Background()
+
+	cases := []struct {
+		name         string
+		retryTimeout bool
+		ctx          context.Context
+		err          error
+		want         bool
+	}{
+		{"nil error", true, alive, nil, false},
+		{"caller cancelled + net.Error: honor cancellation", true, done, netErr, false},
+		{"caller cancelled + Canceled err", true, done, context.Canceled, false},
+		{"live ctx + transient net.Error: retry", true, alive, netErr, true},
+		{"live ctx + client timeout, flag on: retry", true, alive, context.DeadlineExceeded, true},
+		{"live ctx + client timeout, flag off: no retry", false, alive, context.DeadlineExceeded, false},
+		{"caller deadline done + DeadlineExceeded, flag on: honor cancellation", true, done, context.DeadlineExceeded, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := New(WithRetry(RetryConfig{RetryClientTimeout: tc.retryTimeout}))
+			if got := c.shouldRetryError(tc.ctx, tc.err); got != tc.want {
+				t.Fatalf("shouldRetryError(ctx, %v) = %v, want %v", tc.err, got, tc.want)
+			}
+		})
 	}
 }
