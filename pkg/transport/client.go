@@ -26,6 +26,27 @@ type RetryConfig struct {
 	InitialBackoff time.Duration
 	MaxBackoff     time.Duration
 	Jitter         time.Duration
+
+	// RetryClientTimeout enables retrying per-request client timeouts
+	// (http.Client.Timeout firing while a request is in flight). It is off by
+	// default: a timeout is ambiguous for non-idempotent requests because the
+	// server may have already processed the request before the client gave up,
+	// so a blind retry can duplicate side effects.
+	//
+	// The flag is per-Client and applies to every replayable request the client
+	// makes — including POSTs/PATCHes with a body, since http.NewRequest sets
+	// GetBody for the standard *bytes.Reader/*strings.Reader/*bytes.Buffer
+	// bodies, which makes them replayable. Enable it only on a client dedicated
+	// to idempotent requests (e.g. read-only GETs); do not enable it on a client
+	// shared with non-idempotent writes.
+	//
+	// It only governs timeouts that surface as context.DeadlineExceeded. Lower
+	// level i/o timeouts that present as a bare net.Error are retried as
+	// transient network errors regardless of this flag (pre-existing behavior).
+	//
+	// This never overrides caller cancellation: if the context passed to Do is
+	// itself done, the request is not retried regardless of this flag.
+	RetryClientTimeout bool
 }
 
 var defaultRetryConfig = RetryConfig{
@@ -164,7 +185,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 
 		resp, err := c.httpClient.Do(attemptReq)
 		if err != nil {
-			if !shouldRetryError(err) || attempt == attempts {
+			if !c.shouldRetryError(req.Context(), err) || attempt == attempts {
 				return nil, err
 			}
 			lastErr = err
@@ -309,12 +330,28 @@ func normalizeRetryConfig(cfg RetryConfig) RetryConfig {
 	return cfg
 }
 
-func shouldRetryError(err error) bool {
+// shouldRetryError reports whether a transport error from http.Client.Do is
+// worth retrying. ctx is the caller's request context; if it is already done,
+// the caller cancelled or its deadline expired and we must not retry.
+//
+// A per-request client timeout (http.Client.Timeout) surfaces as
+// context.DeadlineExceeded too, but with the caller's ctx still alive. That
+// case is indistinguishable from a caller deadline by the error alone, so we
+// rely on ctx.Err(): a live ctx means our own timer fired, which is retryable
+// only when RetryClientTimeout is enabled (see RetryConfig).
+func (c *Client) shouldRetryError(ctx context.Context, err error) bool {
 	if err == nil {
 		return false
 	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	// Caller cancelled or its own deadline expired — honor it, never retry.
+	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
 		return false
+	}
+	// Per-request client timeout: ctx is alive, so this is our timer, not the
+	// caller's. Opt-in only, because retrying a timeout is unsafe for
+	// non-idempotent requests.
+	if errors.Is(err, context.DeadlineExceeded) {
+		return c.retry.RetryClientTimeout
 	}
 
 	var netErr net.Error
