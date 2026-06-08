@@ -1,10 +1,12 @@
 package transport
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -105,4 +107,127 @@ func TestDoAppliesBaseHeaders(t *testing.T) {
 		t.Fatalf("Do failed: %v", err)
 	}
 	_ = resp.Body.Close()
+}
+
+// slowFirstAttemptServer returns a server whose first request blocks past the
+// client timeout and whose subsequent requests respond immediately, plus a
+// func reporting how many requests it received.
+func slowFirstAttemptServer(t *testing.T, firstDelay time.Duration) (*httptest.Server, func() int) {
+	t.Helper()
+	var mu sync.Mutex
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits++
+		n := hits
+		mu.Unlock()
+		if n == 1 {
+			time.Sleep(firstDelay)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	return srv, func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return hits
+	}
+}
+
+func TestDoDoesNotRetryClientTimeoutByDefault(t *testing.T) {
+	t.Parallel()
+
+	srv, hits := slowFirstAttemptServer(t, 500*time.Millisecond)
+	defer srv.Close()
+
+	client := New(
+		WithTimeout(100*time.Millisecond),
+		WithRetry(RetryConfig{
+			MaxAttempts:    3,
+			InitialBackoff: time.Millisecond,
+			MaxBackoff:     time.Millisecond,
+			// RetryClientTimeout defaults to false.
+		}),
+	)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err == nil {
+		_ = resp.Body.Close()
+		t.Fatalf("expected client timeout error, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected DeadlineExceeded, got %v", err)
+	}
+	if got := hits(); got != 1 {
+		t.Fatalf("expected exactly 1 attempt (no retry by default), got %d", got)
+	}
+}
+
+func TestDoRetriesClientTimeoutWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	srv, hits := slowFirstAttemptServer(t, 500*time.Millisecond)
+	defer srv.Close()
+
+	client := New(
+		WithTimeout(100*time.Millisecond),
+		WithRetry(RetryConfig{
+			MaxAttempts:        3,
+			InitialBackoff:     time.Millisecond,
+			MaxBackoff:         time.Millisecond,
+			RetryClientTimeout: true,
+		}),
+	)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("expected success after retrying timeout, got %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if got := hits(); got != 2 {
+		t.Fatalf("expected 2 attempts (timeout then success), got %d", got)
+	}
+}
+
+func TestDoDoesNotRetryCallerDeadlineEvenWhenTimeoutRetryEnabled(t *testing.T) {
+	t.Parallel()
+
+	srv, hits := slowFirstAttemptServer(t, 500*time.Millisecond)
+	defer srv.Close()
+
+	// No client-level timeout: the only deadline is the caller's context.
+	client := New(WithRetry(RetryConfig{
+		MaxAttempts:        3,
+		InitialBackoff:     time.Millisecond,
+		MaxBackoff:         time.Millisecond,
+		RetryClientTimeout: true, // opt-in must NOT override caller cancellation
+	}))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err == nil {
+		_ = resp.Body.Close()
+		t.Fatalf("expected caller-deadline error, got nil")
+	}
+	if got := hits(); got != 1 {
+		t.Fatalf("expected exactly 1 attempt (caller deadline, no retry), got %d", got)
+	}
 }
