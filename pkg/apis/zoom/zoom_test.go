@@ -360,3 +360,60 @@ func TestTokenSource_RefreshFailureSurfaces(t *testing.T) {
 	}
 }
 
+
+func TestMeetings_ListPastParticipants_Paginates(t *testing.T) {
+	c, env := newTestEnv(t, true)
+	var gotPath string
+	env.apiHandler = func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+		if r.URL.Query().Get("next_page_token") == "" {
+			_, _ = io.WriteString(w, `{"next_page_token":"t2","participants":[{"id":"1","name":"A","user_email":"a@x.com"}]}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"participants":[{"id":"2","name":"B"}]}`)
+	}
+
+	got, err := c.Meetings().ListPastParticipants(context.Background(), "ab/c==")
+	if err != nil {
+		t.Fatalf("ListPastParticipants: %v", err)
+	}
+	// interior slash must reach the wire single-encoded, not re-escaped by the client
+	if want := "/past_meetings/ab%2Fc==/participants"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+	if len(got) != 2 || got[0].UserEmail != "a@x.com" || got[1].Name != "B" {
+		t.Fatalf("unexpected participants: %+v", got)
+	}
+}
+
+func TestMeetings_ListPastParticipants_DoubleEncodesLeadingSlash(t *testing.T) {
+	c, env := newTestEnv(t, true)
+	var gotPath string
+	env.apiHandler = func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+		_, _ = io.WriteString(w, `{"participants":[]}`)
+	}
+
+	if _, err := c.Meetings().ListPastParticipants(context.Background(), "/abc=="); err != nil {
+		t.Fatalf("ListPastParticipants: %v", err)
+	}
+	if want := "/past_meetings/%252Fabc==/participants"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+}
+
+func TestMeetings_ListPastParticipants_StopsOnEchoedToken(t *testing.T) {
+	c, env := newTestEnv(t, true)
+	env.apiHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"next_page_token":"same","participants":[{"id":"1","name":"A"}]}`)
+	}
+
+	got, err := c.Meetings().ListPastParticipants(context.Background(), "abc==")
+	if err != nil {
+		t.Fatalf("ListPastParticipants: %v", err)
+	}
+	// first page + one echoed page, then bail — not an infinite loop
+	if len(got) != 2 {
+		t.Fatalf("expected 2 participants (two pages then stop), got %d", len(got))
+	}
+}

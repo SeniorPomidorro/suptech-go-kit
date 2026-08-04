@@ -270,3 +270,51 @@ func (s *MeetingsService) ListByUser(ctx context.Context, userIDOrEmail string, 
 	}
 	return &out, nil
 }
+
+// PastParticipant is one attendee of a finished meeting. UserEmail is filled
+// only for users of our Zoom account; external guests come with an empty email.
+type PastParticipant struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	UserEmail string `json:"user_email"`
+}
+
+// ListPastParticipants returns everyone who attended a finished meeting,
+// following next_page_token to the end. Accepts a numeric meeting id or a
+// meeting UUID (UUIDs starting with "/" or containing "//" are double-encoded
+// as the Zoom API requires).
+//
+// Endpoint: GET /past_meetings/{meetingIdOrUUID}/participants.
+// Required scope (granular): meeting:read:list_past_participants:admin.
+func (s *MeetingsService) ListPastParticipants(ctx context.Context, meetingIDOrUUID string) ([]PastParticipant, error) {
+	id := strings.TrimSpace(meetingIDOrUUID)
+	if id == "" {
+		return nil, fmt.Errorf("zoom: meetingId is required")
+	}
+	// single-encode the segment (buildRequest preserves it via RawPath); UUIDs starting with "/"
+	// or containing "//" must be double-encoded per the Zoom API rules.
+	seg := url.PathEscape(id)
+	if strings.HasPrefix(id, "/") || strings.Contains(id, "//") {
+		seg = url.PathEscape(seg)
+	}
+	path := "/past_meetings/" + seg + "/participants"
+
+	q := url.Values{}
+	q.Set("page_size", "300")
+	var all []PastParticipant
+	for {
+		var out struct {
+			NextPageToken string            `json:"next_page_token"`
+			Participants  []PastParticipant `json:"participants"`
+		}
+		if err := s.client.doJSON(ctx, http.MethodGet, path, q, nil, &out); err != nil {
+			return nil, err
+		}
+		all = append(all, out.Participants...)
+		// a server echoing the same token would otherwise spin this loop until ctx cancel
+		if out.NextPageToken == "" || out.NextPageToken == q.Get("next_page_token") {
+			return all, nil
+		}
+		q.Set("next_page_token", out.NextPageToken)
+	}
+}
