@@ -291,12 +291,13 @@ func (s *MeetingsService) ListPastParticipants(ctx context.Context, meetingIDOrU
 	if id == "" {
 		return nil, fmt.Errorf("zoom: meetingId is required")
 	}
+	// single-encode the segment (buildRequest preserves it via RawPath); UUIDs starting with "/"
+	// or containing "//" must be double-encoded per the Zoom API rules.
+	seg := url.PathEscape(id)
 	if strings.HasPrefix(id, "/") || strings.Contains(id, "//") {
-		id = url.QueryEscape(url.QueryEscape(id))
-	} else {
-		id = url.PathEscape(id)
+		seg = url.PathEscape(seg)
 	}
-	path := "/past_meetings/" + id + "/participants"
+	path := "/past_meetings/" + seg + "/participants"
 
 	q := url.Values{}
 	q.Set("page_size", "300")
@@ -310,7 +311,8 @@ func (s *MeetingsService) ListPastParticipants(ctx context.Context, meetingIDOrU
 			return nil, err
 		}
 		all = append(all, out.Participants...)
-		if out.NextPageToken == "" {
+		// a server echoing the same token would otherwise spin this loop until ctx cancel
+		if out.NextPageToken == "" || out.NextPageToken == q.Get("next_page_token") {
 			return all, nil
 		}
 		q.Set("next_page_token", out.NextPageToken)

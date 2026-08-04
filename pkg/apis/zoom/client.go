@@ -183,8 +183,16 @@ func (c *Client) buildRequest(ctx context.Context, method, path string, query ur
 	if !strings.HasPrefix(rel, "/") {
 		rel = "/" + rel
 	}
-	// TrimRight defensively in case baseURL ended with a slash from somewhere we missed.
-	endpoint := base.ResolveReference(&url.URL{Path: strings.TrimRight(base.Path, "/") + rel})
+	// path is taken as already-escaped: RawPath preserves caller escaping (e.g. %2F inside a
+	// meeting-UUID segment) instead of re-escaping the percent signs; for the common case of a
+	// path with nothing to unescape, Path == RawPath and behavior is unchanged.
+	unescaped, err := url.PathUnescape(rel)
+	if err != nil {
+		unescaped = rel
+	}
+	endpoint := *base
+	endpoint.Path = strings.TrimRight(base.Path, "/") + unescaped
+	endpoint.RawPath = strings.TrimRight(base.EscapedPath(), "/") + rel
 	if len(query) > 0 {
 		endpoint.RawQuery = query.Encode()
 	}
