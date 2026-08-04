@@ -360,3 +360,25 @@ func TestTokenSource_RefreshFailureSurfaces(t *testing.T) {
 	}
 }
 
+
+func TestMeetings_ListPastParticipants_Paginates(t *testing.T) {
+	c, env := newTestEnv(t, true)
+	env.apiHandler = func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/past_meetings/abc==/participants" {
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+		if r.URL.Query().Get("next_page_token") == "" {
+			_, _ = io.WriteString(w, `{"next_page_token":"t2","participants":[{"id":"1","name":"A","user_email":"a@x.com"}]}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"participants":[{"id":"2","name":"B"}]}`)
+	}
+
+	got, err := c.Meetings().ListPastParticipants(context.Background(), "abc==")
+	if err != nil {
+		t.Fatalf("ListPastParticipants: %v", err)
+	}
+	if len(got) != 2 || got[0].UserEmail != "a@x.com" || got[1].Name != "B" {
+		t.Fatalf("unexpected participants: %+v", got)
+	}
+}
