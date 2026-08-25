@@ -185,14 +185,15 @@ type EphemeralPostResult struct {
 // Blocks and Attachments accept any JSON-serializable structs
 // (e.g. slack-go block types, maps, or custom structs).
 type PostMessageRequest struct {
-	Channel     string         `json:"channel"`
-	Text        string         `json:"text,omitempty"`
-	Blocks      []any          `json:"blocks,omitempty"`
-	Attachments []any          `json:"attachments,omitempty"`
-	ThreadTS    string         `json:"thread_ts,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	UnfurlLinks *bool          `json:"unfurl_links,omitempty"`
-	UnfurlMedia *bool          `json:"unfurl_media,omitempty"`
+	Channel        string         `json:"channel"`
+	Text           string         `json:"text,omitempty"`
+	Blocks         []any          `json:"blocks,omitempty"`
+	Attachments    []any          `json:"attachments,omitempty"`
+	ThreadTS       string         `json:"thread_ts,omitempty"`
+	ReplyBroadcast bool           `json:"reply_broadcast,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
+	UnfurlLinks    *bool          `json:"unfurl_links,omitempty"`
+	UnfurlMedia    *bool          `json:"unfurl_media,omitempty"`
 }
 
 // PostEphemeralRequest is the payload for chat.postEphemeral.
