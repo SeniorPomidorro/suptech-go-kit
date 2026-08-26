@@ -72,3 +72,38 @@ func TestNewSession_Validation(t *testing.T) {
 		t.Error("expected error when client secret is empty")
 	}
 }
+
+// chat frames carry plain UTF-8 text and scalar ids that may be numbers or strings.
+func TestHandleChat(t *testing.T) {
+	t.Parallel()
+	var got []ChatMessage
+	s := &Session{cfg: Config{Handlers: Handlers{OnChat: func(m ChatMessage) { got = append(got, m) }}}}
+
+	s.handleChat([]byte(`{"msg_type":18,"content":{"user_id":123,"user_name":"Bob","data":"see https://a.b/c","timestamp":1700000000000,"message_id":"m1","operation_type":"send"}}`))
+	s.handleChat([]byte(`{"msg_type":18,"content":{"user_name":"Eve","text":"hi"}}`))
+	s.handleChat([]byte(`{"msg_type":18,"content":{"user_name":"Empty"}}`))
+	s.handleChat([]byte(`not-json`))
+
+	if len(got) != 2 {
+		t.Fatalf("delivered %d messages, want 2", len(got))
+	}
+	m := got[0]
+	if m.UserID != "123" || m.UserName != "Bob" || m.Text != "see https://a.b/c" || m.MessageID != "m1" || m.OperationType != "send" || m.Timestamp != 1700000000000 {
+		t.Errorf("first message = %+v", m)
+	}
+	if got[1].Text != "hi" {
+		t.Errorf("text fallback = %+v", got[1])
+	}
+}
+
+func TestMediaTypesBitmask(t *testing.T) {
+	t.Parallel()
+	audioOnly := &Session{cfg: Config{Handlers: Handlers{OnAudio: func(AudioFrame) {}}}}
+	if got := audioOnly.mediaTypes(); got != mediaTypeAudio {
+		t.Fatalf("audio-only mask = %d, want %d", got, mediaTypeAudio)
+	}
+	withChat := &Session{cfg: Config{Handlers: Handlers{OnAudio: func(AudioFrame) {}, OnChat: func(ChatMessage) {}}}}
+	if got := withChat.mediaTypes(); got != mediaTypeAudio|mediaTypeChat {
+		t.Fatalf("chat mask = %d, want %d", got, mediaTypeAudio|mediaTypeChat)
+	}
+}

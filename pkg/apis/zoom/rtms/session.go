@@ -46,12 +46,25 @@ type Transcript struct {
 	IsFinal  bool
 }
 
+// ChatMessage is one in-meeting chat message, delivered only when the caller
+// subscribes to the chat media type by setting Handlers.OnChat.
+type ChatMessage struct {
+	UserID          string
+	UserName        string
+	Text            string
+	MessageID       string
+	ParentMessageID string
+	OperationType   string // send | edit | delete (as sent by Zoom; empty on older streams)
+	Timestamp       int64  // unix millis
+}
+
 // Handlers receive session events. They are invoked from the media read goroutine
 // and MUST NOT block — offload heavy work (transcription, disk, network) to your
 // own goroutines, or you will stall audio reception and Zoom will drop the stream.
 type Handlers struct {
-	OnAudio      func(AudioFrame) // required
-	OnTranscript func(Transcript) // optional
+	OnAudio      func(AudioFrame)  // required
+	OnTranscript func(Transcript)  // optional
+	OnChat       func(ChatMessage) // optional; setting it subscribes the session to chat media
 }
 
 // Config describes one RTMS stream. SignalingURL, MeetingUUID and StreamID come
@@ -131,7 +144,7 @@ func (s *Session) Run(ctx context.Context) error {
 		"rtms_stream_id":   s.cfg.StreamID,
 		"sequence":         time.Now().UnixMilli(),
 		"signature":        s.signature(),
-		"media_type":       mediaTypeAudio,
+		"media_type":       s.mediaTypes(),
 	}
 	if err := s.sig.Load().WriteJSON(handshake); err != nil {
 		return fmt.Errorf("rtms: signaling handshake: %w", err)
@@ -209,24 +222,30 @@ func (s *Session) mediaLoop(ctx context.Context, url string) {
 	s.media.Store(mc)
 
 	// Data handshake: request RAW L16 PCM 16 kHz mono, multi-stream, 20 ms chunks.
+	mediaParams := map[string]any{
+		"audio": map[string]any{
+			"content_type": 2,  // RAW_AUDIO
+			"sample_rate":  1,  // 16 kHz
+			"channel":      1,  // mono
+			"codec":        1,  // L16 (PCM)
+			"data_opt":     2,  // AUDIO_MULTI_STREAMS (per-participant, with user_id)
+			"send_rate":    20, // ms per chunk
+		},
+	}
+	if s.cfg.Handlers.OnChat != nil {
+		mediaParams["chat"] = map[string]any{
+			"content_type": 5, // TEXT
+		}
+	}
 	req := map[string]any{
 		"msg_type":           msgDataHandshakeReq,
 		"protocol_version":   1,
 		"meeting_uuid":       s.cfg.MeetingUUID,
 		"rtms_stream_id":     s.cfg.StreamID,
 		"signature":          s.signature(),
-		"media_type":         mediaTypeAudio,
+		"media_type":         s.mediaTypes(),
 		"payload_encryption": false,
-		"media_params": map[string]any{
-			"audio": map[string]any{
-				"content_type": 2,  // RAW_AUDIO
-				"sample_rate":  1,  // 16 kHz
-				"channel":      1,  // mono
-				"codec":        1,  // L16 (PCM)
-				"data_opt":     2,  // AUDIO_MULTI_STREAMS (per-participant, with user_id)
-				"send_rate":    20, // ms per chunk
-			},
-		},
+		"media_params":       mediaParams,
 	}
 	if err := mc.WriteJSON(req); err != nil {
 		s.fail(fmt.Errorf("rtms: media handshake: %w", err))
@@ -270,6 +289,9 @@ func (s *Session) mediaLoop(ctx context.Context, url string) {
 		case msgMediaTranscript:
 			s.handleTranscript(data)
 
+		case msgMediaChat:
+			s.handleChat(data)
+
 		case msgKeepAliveReq:
 			s.replyKeepAlive(mc, data)
 
@@ -309,6 +331,50 @@ func (s *Session) handleTranscript(data []byte) {
 	if text != "" {
 		s.cfg.Handlers.OnTranscript(Transcript{UserName: m.Content.UserName, Text: text, IsFinal: m.Content.IsFinal})
 	}
+}
+
+// handleChat decodes a chat frame; text arrives as plain UTF-8 in content.data (or text on some streams).
+func (s *Session) handleChat(data []byte) {
+	if s.cfg.Handlers.OnChat == nil {
+		return
+	}
+	var m struct {
+		Content struct {
+			Text            string          `json:"text"`
+			Data            string          `json:"data"`
+			UserID          json.RawMessage `json:"user_id"`
+			UserName        string          `json:"user_name"`
+			MessageID       json.RawMessage `json:"message_id"`
+			ParentMessageID json.RawMessage `json:"parent_message_id"`
+			OperationType   json.RawMessage `json:"operation_type"`
+			Timestamp       int64           `json:"timestamp"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return
+	}
+	text := firstNonEmpty(m.Content.Text, m.Content.Data)
+	if text == "" {
+		return
+	}
+	s.cfg.Handlers.OnChat(ChatMessage{
+		UserID:          jsonScalarToString(m.Content.UserID),
+		UserName:        m.Content.UserName,
+		Text:            text,
+		MessageID:       jsonScalarToString(m.Content.MessageID),
+		ParentMessageID: jsonScalarToString(m.Content.ParentMessageID),
+		OperationType:   jsonScalarToString(m.Content.OperationType),
+		Timestamp:       m.Content.Timestamp,
+	})
+}
+
+// mediaTypes builds the subscription bitmask from the configured handlers.
+func (s *Session) mediaTypes() int {
+	types := mediaTypeAudio
+	if s.cfg.Handlers.OnChat != nil {
+		types |= mediaTypeChat
+	}
+	return types
 }
 
 // replyKeepAlive echoes a keep-alive request. RTMS is server-initiated: the media

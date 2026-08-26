@@ -22,12 +22,14 @@ const (
 	msgKeepAliveResp          = 13
 	msgMediaAudio             = 14
 	msgMediaTranscript        = 17
+	msgMediaChat              = 18
 )
 
 // media_type subscription bitmask.
 const (
 	mediaTypeAudio      = 1
 	mediaTypeTranscript = 8
+	mediaTypeChat       = 16
 )
 
 // handshakeSignature signs the RTMS handshake the way the media server expects:
