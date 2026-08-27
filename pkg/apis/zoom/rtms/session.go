@@ -90,9 +90,11 @@ type Session struct {
 	cfg Config
 	log transport.Logger
 
-	sig   atomic.Pointer[safeConn]
-	media atomic.Pointer[safeConn]
-	wg    sync.WaitGroup
+	sig atomic.Pointer[safeConn]
+	wg  sync.WaitGroup
+
+	mediaMu    sync.Mutex
+	mediaConns []*safeConn
 
 	cancel   context.CancelFunc
 	failOnce sync.Once
@@ -179,6 +181,7 @@ func (s *Session) signalingLoop(ctx context.Context) {
 				MediaServer struct {
 					ServerURLs struct {
 						Audio string `json:"audio"`
+						Chat  string `json:"chat"`
 						All   string `json:"all"`
 					} `json:"server_urls"`
 				} `json:"media_server"`
@@ -189,14 +192,17 @@ func (s *Session) signalingLoop(ctx context.Context) {
 				s.fail(fmt.Errorf("rtms: signaling handshake rejected: status=%d", resp.StatusCode))
 				return
 			}
-			mediaURL := firstNonEmpty(resp.MediaServer.ServerURLs.All, resp.MediaServer.ServerURLs.Audio, resp.MediaServerURL)
-			if mediaURL == "" {
+			u := resp.MediaServer.ServerURLs
+			targets := s.mediaTargets(u.All, u.Audio, u.Chat, resp.MediaServerURL)
+			if targets[0].url == "" {
 				s.fail(errors.New("rtms: no media server url in signaling response"))
 				return
 			}
-			s.log.Printf("rtms[%s]: signaling OK, media server: %s", s.short(), mediaURL)
-			s.wg.Add(1)
-			go s.mediaLoop(ctx, mediaURL)
+			s.log.Printf("rtms[%s]: signaling OK, media sockets: %d (all=%t audio=%t chat=%t)", s.short(), len(targets), u.All != "", u.Audio != "", u.Chat != "")
+			for _, t := range targets {
+				s.wg.Add(1)
+				go s.mediaLoop(ctx, t)
+			}
 
 		case msgKeepAliveReq:
 			s.replyKeepAlive(conn, data)
@@ -210,19 +216,17 @@ func (s *Session) signalingLoop(ctx context.Context) {
 	}
 }
 
-func (s *Session) mediaLoop(ctx context.Context, url string) {
-	defer s.wg.Done()
+// mediaTarget is one media websocket to open: what to dial, which media_type mask to request, and whether its failures are session-fatal.
+type mediaTarget struct {
+	url     string
+	mask    int
+	params  map[string]any
+	primary bool
+}
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, url, nil)
-	if err != nil {
-		s.fail(fmt.Errorf("rtms: media dial: %w", err))
-		return
-	}
-	mc := newSafeConn(conn)
-	s.media.Store(mc)
-
-	// Data handshake: request RAW L16 PCM 16 kHz mono, multi-stream, 20 ms chunks.
-	mediaParams := map[string]any{
+func audioMediaParams() map[string]any {
+	// RAW L16 PCM 16 kHz mono, multi-stream, 20 ms chunks
+	return map[string]any{
 		"audio": map[string]any{
 			"content_type": 2,  // RAW_AUDIO
 			"sample_rate":  1,  // 16 kHz
@@ -232,33 +236,79 @@ func (s *Session) mediaLoop(ctx context.Context, url string) {
 			"send_rate":    20, // ms per chunk
 		},
 	}
-	if s.cfg.Handlers.OnChat != nil {
-		mediaParams["chat"] = map[string]any{
+}
+
+func chatMediaParams() map[string]any {
+	return map[string]any{
+		"chat": map[string]any{
 			"content_type": 5, // TEXT
-		}
+		},
 	}
+}
+
+// mediaTargets mirrors Zoom's reference manager: one unified socket when `all` is offered, otherwise one socket per media type — a combined mask on a typed socket is rejected with status=14.
+func (s *Session) mediaTargets(all, audio, chat, flat string) []mediaTarget {
+	if s.cfg.Handlers.OnChat == nil {
+		return []mediaTarget{{url: firstNonEmpty(all, audio, flat), mask: mediaTypeAudio, params: audioMediaParams(), primary: true}}
+	}
+	if all != "" {
+		params := audioMediaParams()
+		params["chat"] = chatMediaParams()["chat"]
+		return []mediaTarget{{url: all, mask: mediaTypeAudio | mediaTypeChat, params: params, primary: true}}
+	}
+	targets := []mediaTarget{{url: firstNonEmpty(audio, flat), mask: mediaTypeAudio, params: audioMediaParams(), primary: true}}
+	if chatURL := firstNonEmpty(chat, flat); chatURL != "" {
+		targets = append(targets, mediaTarget{url: chatURL, mask: mediaTypeChat, params: chatMediaParams()})
+	}
+	return targets
+}
+
+func (s *Session) mediaLoop(ctx context.Context, t mediaTarget) {
+	defer s.wg.Done()
+	label := "media"
+	if !t.primary {
+		label = "chat media"
+	}
+
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, t.url, nil)
+	if err != nil {
+		// chat is best-effort: its socket must never take the recording down
+		if t.primary {
+			s.fail(fmt.Errorf("rtms: media dial: %w", err))
+		} else {
+			s.log.Printf("rtms[%s]: %s dial failed: %v", s.short(), label, err)
+		}
+		return
+	}
+	mc := newSafeConn(conn)
+	s.trackMediaConn(mc)
+
 	req := map[string]any{
 		"msg_type":           msgDataHandshakeReq,
 		"protocol_version":   1,
 		"meeting_uuid":       s.cfg.MeetingUUID,
 		"rtms_stream_id":     s.cfg.StreamID,
 		"signature":          s.signature(),
-		"media_type":         s.mediaTypes(),
+		"media_type":         t.mask,
 		"payload_encryption": false,
-		"media_params":       mediaParams,
+		"media_params":       t.params,
 	}
 	if err := mc.WriteJSON(req); err != nil {
-		s.fail(fmt.Errorf("rtms: media handshake: %w", err))
+		if t.primary {
+			s.fail(fmt.Errorf("rtms: media handshake: %w", err))
+		} else {
+			s.log.Printf("rtms[%s]: %s handshake failed: %v", s.short(), label, err)
+		}
 		return
 	}
-	s.log.Printf("rtms[%s]: media handshake sent", s.short())
+	s.log.Printf("rtms[%s]: %s handshake sent", s.short(), label)
 
 	for {
 		_, data, err := mc.ReadMessage()
 		if err != nil {
-			// Unexpected media close ends the session too — otherwise signaling
+			// An unexpected primary close ends the session — otherwise signaling
 			// keeps Run alive with no audio flowing.
-			if ctx.Err() == nil {
+			if ctx.Err() == nil && t.primary {
 				s.fail(fmt.Errorf("rtms: media closed: %w", err))
 			}
 			return
@@ -270,8 +320,17 @@ func (s *Session) mediaLoop(ctx context.Context, url string) {
 			}
 			_ = json.Unmarshal(data, &resp)
 			if resp.StatusCode != 0 {
-				s.fail(fmt.Errorf("rtms: media handshake rejected: status=%d", resp.StatusCode))
+				if t.primary {
+					s.fail(fmt.Errorf("rtms: media handshake rejected: status=%d", resp.StatusCode))
+				} else {
+					s.log.Printf("rtms[%s]: %s handshake rejected: status=%d — continuing without chat", s.short(), label, resp.StatusCode)
+					_ = mc.Close()
+				}
 				return
+			}
+			if !t.primary {
+				s.log.Printf("rtms[%s]: chat media ready", s.short())
+				continue
 			}
 			// Ready to receive — ACK over the signaling socket.
 			if sc := s.sig.Load(); sc != nil {
@@ -397,11 +456,20 @@ func (s *Session) fail(err error) {
 	}
 }
 
+// trackMediaConn registers a media socket so cancellation closes it and unblocks its read loop.
+func (s *Session) trackMediaConn(c *safeConn) {
+	s.mediaMu.Lock()
+	s.mediaConns = append(s.mediaConns, c)
+	s.mediaMu.Unlock()
+}
+
 func (s *Session) closeConns() {
 	if c := s.sig.Load(); c != nil {
 		_ = c.Close()
 	}
-	if c := s.media.Load(); c != nil {
+	s.mediaMu.Lock()
+	defer s.mediaMu.Unlock()
+	for _, c := range s.mediaConns {
 		_ = c.Close()
 	}
 }

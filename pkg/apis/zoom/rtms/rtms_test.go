@@ -107,3 +107,28 @@ func TestMediaTypesBitmask(t *testing.T) {
 		t.Fatalf("chat mask = %d, want %d", got, mediaTypeAudio|mediaTypeChat)
 	}
 }
+
+// mediaTargets mirrors Zoom's manager: unified socket on `all`, split per-type sockets otherwise.
+func TestMediaTargets(t *testing.T) {
+	t.Parallel()
+	chatOn := &Session{cfg: Config{Handlers: Handlers{OnAudio: func(AudioFrame) {}, OnChat: func(ChatMessage) {}}}}
+	chatOff := &Session{cfg: Config{Handlers: Handlers{OnAudio: func(AudioFrame) {}}}}
+
+	if got := chatOff.mediaTargets("wss://all", "wss://audio", "wss://chat", "wss://flat"); len(got) != 1 || got[0].mask != mediaTypeAudio || got[0].url != "wss://all" || !got[0].primary {
+		t.Fatalf("chat off: %+v", got)
+	}
+	if got := chatOn.mediaTargets("wss://all", "", "", ""); len(got) != 1 || got[0].mask != mediaTypeAudio|mediaTypeChat || got[0].params["chat"] == nil {
+		t.Fatalf("unified: %+v", got)
+	}
+	got := chatOn.mediaTargets("", "wss://audio", "wss://chat", "")
+	if len(got) != 2 || got[0].mask != mediaTypeAudio || !got[0].primary || got[1].mask != mediaTypeChat || got[1].primary || got[1].url != "wss://chat" {
+		t.Fatalf("split: %+v", got)
+	}
+	if _, ok := got[0].params["chat"]; ok {
+		t.Fatalf("audio socket must not carry chat params: %+v", got[0].params)
+	}
+	got = chatOn.mediaTargets("", "", "", "wss://flat")
+	if len(got) != 2 || got[0].url != "wss://flat" || got[1].url != "wss://flat" {
+		t.Fatalf("flat fallback: %+v", got)
+	}
+}
