@@ -93,8 +93,9 @@ type Session struct {
 	sig atomic.Pointer[safeConn]
 	wg  sync.WaitGroup
 
-	mediaMu    sync.Mutex
-	mediaConns []*safeConn
+	mediaMu     sync.Mutex
+	mediaConns  []*safeConn
+	mediaClosed bool
 
 	cancel   context.CancelFunc
 	failOnce sync.Once
@@ -310,6 +311,8 @@ func (s *Session) mediaLoop(ctx context.Context, t mediaTarget) {
 			// keeps Run alive with no audio flowing.
 			if ctx.Err() == nil && t.primary {
 				s.fail(fmt.Errorf("rtms: media closed: %w", err))
+			} else if ctx.Err() == nil {
+				s.log.Printf("rtms[%s]: %s closed: %v — continuing without chat", s.short(), label, err)
 			}
 			return
 		}
@@ -456,11 +459,15 @@ func (s *Session) fail(err error) {
 	}
 }
 
-// trackMediaConn registers a media socket so cancellation closes it and unblocks its read loop.
+// trackMediaConn registers a media socket so cancellation closes it; a socket dialed after closeConns already ran is closed on the spot, or its read loop would block wg.Wait forever.
 func (s *Session) trackMediaConn(c *safeConn) {
 	s.mediaMu.Lock()
+	defer s.mediaMu.Unlock()
+	if s.mediaClosed {
+		_ = c.Close()
+		return
+	}
 	s.mediaConns = append(s.mediaConns, c)
-	s.mediaMu.Unlock()
 }
 
 func (s *Session) closeConns() {
@@ -469,6 +476,7 @@ func (s *Session) closeConns() {
 	}
 	s.mediaMu.Lock()
 	defer s.mediaMu.Unlock()
+	s.mediaClosed = true
 	for _, c := range s.mediaConns {
 		_ = c.Close()
 	}
