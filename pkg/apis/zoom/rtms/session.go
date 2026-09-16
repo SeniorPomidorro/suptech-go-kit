@@ -46,6 +46,16 @@ type Transcript struct {
 	IsFinal  bool
 }
 
+// RTMS_CHAT_OPERATION_TYPE values as sent by Zoom in chat frames.
+const (
+	ChatOpUndefined      = 0
+	ChatOpNew            = 1
+	ChatOpDelete         = 2
+	ChatOpUpdate         = 3
+	ChatOpAddReaction    = 4
+	ChatOpRemoveReaction = 5
+)
+
 // ChatMessage is one in-meeting chat message, delivered only when the caller
 // subscribes to the chat media type by setting Handlers.OnChat.
 type ChatMessage struct {
@@ -54,8 +64,8 @@ type ChatMessage struct {
 	Text            string
 	MessageID       string
 	ParentMessageID string
-	OperationType   string // send | edit | delete (as sent by Zoom; empty on older streams)
-	Timestamp       int64  // unix millis
+	OperationType   int   // ChatOp* enum; ChatOpUndefined on streams that omit it
+	Timestamp       int64 // unix millis
 }
 
 // Handlers receive session events. They are invoked from the media read goroutine
@@ -400,10 +410,15 @@ func (s *Session) handleChat(data []byte) {
 	}
 	var m struct {
 		Content struct {
-			Text            string          `json:"text"`
-			Data            string          `json:"data"`
-			UserID          json.RawMessage `json:"user_id"`
-			UserName        string          `json:"user_name"`
+			Text     string          `json:"text"`
+			Data     string          `json:"data"`
+			UserID   json.RawMessage `json:"user_id"`
+			UserName string          `json:"user_name"`
+			// real Zoom streams nest the author under sender; the flat fields are a mock-server shape
+			Sender struct {
+				UserID   json.RawMessage `json:"user_id"`
+				UserName string          `json:"user_name"`
+			} `json:"sender"`
 			MessageID       json.RawMessage `json:"message_id"`
 			ParentMessageID json.RawMessage `json:"parent_message_id"`
 			OperationType   json.RawMessage `json:"operation_type"`
@@ -418,12 +433,12 @@ func (s *Session) handleChat(data []byte) {
 		return
 	}
 	s.cfg.Handlers.OnChat(ChatMessage{
-		UserID:          jsonScalarToString(m.Content.UserID),
-		UserName:        m.Content.UserName,
+		UserID:          firstNonEmpty(jsonScalarToString(m.Content.Sender.UserID), jsonScalarToString(m.Content.UserID)),
+		UserName:        firstNonEmpty(m.Content.Sender.UserName, m.Content.UserName),
 		Text:            text,
 		MessageID:       jsonScalarToString(m.Content.MessageID),
 		ParentMessageID: jsonScalarToString(m.Content.ParentMessageID),
-		OperationType:   jsonScalarToString(m.Content.OperationType),
+		OperationType:   chatOpFromRaw(m.Content.OperationType),
 		Timestamp:       m.Content.Timestamp,
 	})
 }

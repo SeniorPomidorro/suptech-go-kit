@@ -79,8 +79,8 @@ func TestHandleChat(t *testing.T) {
 	var got []ChatMessage
 	s := &Session{cfg: Config{Handlers: Handlers{OnChat: func(m ChatMessage) { got = append(got, m) }}}}
 
-	s.handleChat([]byte(`{"msg_type":18,"content":{"user_id":123,"user_name":"Bob","data":"see https://a.b/c","timestamp":1700000000000,"message_id":"m1","operation_type":"send"}}`))
-	s.handleChat([]byte(`{"msg_type":18,"content":{"user_name":"Eve","text":"hi"}}`))
+	s.handleChat([]byte(`{"msg_type":18,"content":{"sender":{"user_id":16778240,"user_name":"John"},"data":"see https://a.b/c","timestamp":1700000000000,"message_id":"m1","operation_type":1}}`))
+	s.handleChat([]byte(`{"msg_type":18,"content":{"user_id":123,"user_name":"Bob","text":"hi","operation_type":"send"}}`))
 	s.handleChat([]byte(`{"msg_type":18,"content":{"user_name":"Empty"}}`))
 	s.handleChat([]byte(`not-json`))
 
@@ -88,11 +88,12 @@ func TestHandleChat(t *testing.T) {
 		t.Fatalf("delivered %d messages, want 2", len(got))
 	}
 	m := got[0]
-	if m.UserID != "123" || m.UserName != "Bob" || m.Text != "see https://a.b/c" || m.MessageID != "m1" || m.OperationType != "send" || m.Timestamp != 1700000000000 {
-		t.Errorf("first message = %+v", m)
+	if m.UserID != "16778240" || m.UserName != "John" || m.Text != "see https://a.b/c" || m.MessageID != "m1" || m.OperationType != ChatOpNew || m.Timestamp != 1700000000000 {
+		t.Errorf("real zoom shape = %+v", m)
 	}
-	if got[1].Text != "hi" {
-		t.Errorf("text fallback = %+v", got[1])
+	// mock-server flat shape: sender fields fall back, non-numeric op decodes as undefined
+	if got[1].UserID != "123" || got[1].UserName != "Bob" || got[1].Text != "hi" || got[1].OperationType != ChatOpUndefined {
+		t.Errorf("flat fallback = %+v", got[1])
 	}
 }
 

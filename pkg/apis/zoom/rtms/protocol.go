@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"strconv"
 	"strings"
 )
 
@@ -102,4 +103,13 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+// chatOpFromRaw reads operation_type as a bare or quoted number; anything else is ChatOpUndefined.
+func chatOpFromRaw(r json.RawMessage) int {
+	n, err := strconv.Atoi(jsonScalarToString(r))
+	if err != nil {
+		return ChatOpUndefined
+	}
+	return n
 }
