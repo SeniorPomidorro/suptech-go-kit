@@ -247,18 +247,16 @@ func chatMediaParams() map[string]any {
 	}
 }
 
-// mediaTargets mirrors Zoom's reference manager: one unified socket when `all` is offered, otherwise one socket per media type — a combined mask on a typed socket is rejected with status=14.
+// mediaTargets never couples chat into the primary socket: prod media servers reject a
+// combined audio|chat handshake with status=14 (seen 2026-09-04, even on the unified `all`
+// socket), and a rejected primary kills the whole recording. Audio rides its own socket on
+// the proven audio-only mask; chat always gets a separate best-effort socket.
 func (s *Session) mediaTargets(all, audio, chat, flat string) []mediaTarget {
+	targets := []mediaTarget{{url: firstNonEmpty(all, audio, flat), mask: mediaTypeAudio, params: audioMediaParams(), primary: true}}
 	if s.cfg.Handlers.OnChat == nil {
-		return []mediaTarget{{url: firstNonEmpty(all, audio, flat), mask: mediaTypeAudio, params: audioMediaParams(), primary: true}}
+		return targets
 	}
-	if all != "" {
-		params := audioMediaParams()
-		params["chat"] = chatMediaParams()["chat"]
-		return []mediaTarget{{url: all, mask: mediaTypeAudio | mediaTypeChat, params: params, primary: true}}
-	}
-	targets := []mediaTarget{{url: firstNonEmpty(audio, flat), mask: mediaTypeAudio, params: audioMediaParams(), primary: true}}
-	if chatURL := firstNonEmpty(chat, flat); chatURL != "" {
+	if chatURL := firstNonEmpty(chat, all, flat); chatURL != "" {
 		targets = append(targets, mediaTarget{url: chatURL, mask: mediaTypeChat, params: chatMediaParams()})
 	}
 	return targets

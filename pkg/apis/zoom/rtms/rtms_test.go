@@ -108,7 +108,9 @@ func TestMediaTypesBitmask(t *testing.T) {
 	}
 }
 
-// mediaTargets mirrors Zoom's manager: unified socket on `all`, split per-type sockets otherwise.
+// mediaTargets: audio always rides its own primary socket with the audio-only mask; chat is
+// a separate best-effort socket — a combined audio|chat handshake gets status=14 and a
+// rejected primary would kill the recording.
 func TestMediaTargets(t *testing.T) {
 	t.Parallel()
 	chatOn := &Session{cfg: Config{Handlers: Handlers{OnAudio: func(AudioFrame) {}, OnChat: func(ChatMessage) {}}}}
@@ -117,8 +119,11 @@ func TestMediaTargets(t *testing.T) {
 	if got := chatOff.mediaTargets("wss://all", "wss://audio", "wss://chat", "wss://flat"); len(got) != 1 || got[0].mask != mediaTypeAudio || got[0].url != "wss://all" || !got[0].primary {
 		t.Fatalf("chat off: %+v", got)
 	}
-	if got := chatOn.mediaTargets("wss://all", "", "", ""); len(got) != 1 || got[0].mask != mediaTypeAudio|mediaTypeChat || got[0].params["chat"] == nil {
-		t.Fatalf("unified: %+v", got)
+	if got := chatOn.mediaTargets("wss://all", "", "", ""); len(got) != 2 || got[0].mask != mediaTypeAudio || !got[0].primary || got[0].params["chat"] != nil || got[1].mask != mediaTypeChat || got[1].primary || got[1].url != "wss://all" {
+		t.Fatalf("all-only: %+v", got)
+	}
+	if got := chatOn.mediaTargets("wss://all", "wss://audio", "wss://chat", ""); len(got) != 2 || got[0].url != "wss://all" || got[0].mask != mediaTypeAudio || got[1].url != "wss://chat" {
+		t.Fatalf("all+typed: %+v", got)
 	}
 	got := chatOn.mediaTargets("", "wss://audio", "wss://chat", "")
 	if len(got) != 2 || got[0].mask != mediaTypeAudio || !got[0].primary || got[1].mask != mediaTypeChat || got[1].primary || got[1].url != "wss://chat" {
