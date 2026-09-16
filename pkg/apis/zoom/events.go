@@ -46,6 +46,7 @@ type RTMSFields struct {
 	MeetingID    MeetingID `json:"meeting_id"` // numeric meeting id; matches the meeting to its incident
 	RTMSStreamID string    `json:"rtms_stream_id"`
 	ServerURLs   string    `json:"server_urls"` // signaling WS URL — a string, not an array
+	OperatorID   string    `json:"operator_id"` // zoom user whose app started the stream; empty on stopped events
 }
 
 // RTMSEventPayload decodes an rtms_started/stopped payload. Real Zoom delivers the
