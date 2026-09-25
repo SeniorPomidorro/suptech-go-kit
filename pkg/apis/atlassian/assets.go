@@ -279,6 +279,28 @@ func (s *AssetsService) GetObjectTypeAttributes(ctx context.Context, objectTypeI
 	return attrs, nil
 }
 
+// GetConnectedTickets lists open Jira issues that reference the object; resolved issues are not returned.
+func (s *AssetsService) GetConnectedTickets(ctx context.Context, objectID string) ([]ConnectedTicket, error) {
+	if strings.TrimSpace(objectID) == "" {
+		return nil, errors.New("atlassian: object id is required")
+	}
+	path, err := s.client.assetsPath("/objectconnectedtickets/" + url.PathEscape(objectID) + "/tickets")
+	if err != nil {
+		return nil, err
+	}
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	var body struct {
+		Tickets []ConnectedTicket `json:"tickets"`
+	}
+	if err := s.client.transport.DoJSON(req, &body); err != nil {
+		return nil, err
+	}
+	return body.Tickets, nil
+}
+
 func (c *Client) assetsPath(pathSuffix string) (string, error) {
 	if strings.TrimSpace(c.assetsCloudID) == "" {
 		return "", errors.New("atlassian: assets cloud ID is required")

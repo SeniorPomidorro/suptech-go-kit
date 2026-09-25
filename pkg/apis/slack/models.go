@@ -14,6 +14,15 @@ type UserGroup struct {
 	Name        string `json:"name,omitempty"`
 	Handle      string `json:"handle,omitempty"`
 	Description string `json:"description,omitempty"`
+	DateDelete  int64  `json:"date_delete,omitempty"`
+}
+
+// Disabled reports whether the group was deactivated; Slack can't delete a user group.
+func (g UserGroup) Disabled() bool { return g.DateDelete != 0 }
+
+// ListUserGroupsRequest contains parameters for usergroups.list.
+type ListUserGroupsRequest struct {
+	IncludeDisabled bool
 }
 
 // ListUserGroupUsersRequest contains parameters for usergroups.users.list.

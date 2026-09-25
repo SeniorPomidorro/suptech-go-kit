@@ -795,3 +795,31 @@ func TestNewUpdateAssetObjectRequest(t *testing.T) {
 		t.Fatalf("unexpected value: %q", req.Attributes[0].ObjectAttributeValues[0].Value)
 	}
 }
+
+func TestGetConnectedTickets(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := "/ex/jira/cloud-1/jsm/assets/workspace/ws-9/v1/objectconnectedtickets/2373/tickets"
+		if r.URL.Path != wantPath {
+			t.Fatalf("unexpected path: got=%s want=%s", r.URL.Path, wantPath)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"tickets":[{"id":"971900","key":"TD-225882"}],"allTicketsQuery":"id in (971900) and resolution is empty"}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithCloudBaseURL(srv.URL), WithAssetsCloudID("cloud-1"),
+		WithAssetsWorkspaceID("ws-9"), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	tickets, err := client.Assets().GetConnectedTickets(context.Background(), "2373")
+	if err != nil {
+		t.Fatalf("GetConnectedTickets failed: %v", err)
+	}
+	if len(tickets) != 1 || tickets[0].Key != "TD-225882" || tickets[0].ID != "971900" {
+		t.Fatalf("unexpected tickets: %+v", tickets)
+	}
+}

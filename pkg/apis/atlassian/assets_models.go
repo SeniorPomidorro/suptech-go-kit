@@ -1,5 +1,11 @@
 package atlassian
 
+// ConnectedTicket is a Jira issue that references an Assets object through an Assets field.
+type ConnectedTicket struct {
+	ID  string `json:"id"`
+	Key string `json:"key"`
+}
+
 // AssetsSearchOptions controls AQL pagination and response shape.
 type AssetsSearchOptions struct {
 	StartAt           int

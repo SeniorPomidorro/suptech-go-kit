@@ -40,12 +40,20 @@ func (s *UserGroupsService) CreateUserGroup(ctx context.Context, name, tag strin
 	return &response.UserGroup, nil
 }
 
-// ListUserGroups lists user groups.
+// ListUserGroups lists active user groups.
 func (s *UserGroupsService) ListUserGroups(ctx context.Context) ([]UserGroup, error) {
+	return s.ListUserGroupsWithRequest(ctx, nil)
+}
+
+// ListUserGroupsWithRequest lists user groups; IncludeDisabled adds deactivated ones.
+func (s *UserGroupsService) ListUserGroupsWithRequest(ctx context.Context, req *ListUserGroupsRequest) ([]UserGroup, error) {
 	params := url.Values{}
 	s.client.withTeamID(params)
+	if req != nil && req.IncludeDisabled {
+		params.Set("include_disabled", "true")
+	}
 
-	req, err := s.client.newGetRequest(ctx, "usergroups.list", params)
+	httpReq, err := s.client.newGetRequest(ctx, "usergroups.list", params)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +61,7 @@ func (s *UserGroupsService) ListUserGroups(ctx context.Context) ([]UserGroup, er
 	var response struct {
 		UserGroups []UserGroup `json:"usergroups"`
 	}
-	if err := s.client.do(req, &response); err != nil {
+	if err := s.client.do(httpReq, &response); err != nil {
 		return nil, err
 	}
 	return response.UserGroups, nil

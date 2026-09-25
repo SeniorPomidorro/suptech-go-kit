@@ -167,6 +167,35 @@ func TestGetUsersByGroupIDEmptyListSkipsUsersInfo(t *testing.T) {
 	}
 }
 
+func TestListUserGroupsIncludesDisabled(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/usergroups.list" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("include_disabled") != "true" {
+			t.Fatalf("expected include_disabled=true, got %q", r.URL.Query().Get("include_disabled"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"usergroups":[{"id":"S1","handle":"ops","date_delete":0},{"id":"S2","handle":"old","date_delete":1446747568}]}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithToken("xoxb-test"), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	groups, err := client.UserGroups().ListUserGroupsWithRequest(context.Background(), &ListUserGroupsRequest{IncludeDisabled: true})
+	if err != nil {
+		t.Fatalf("ListUserGroupsWithRequest failed: %v", err)
+	}
+	if len(groups) != 2 || groups[0].Disabled() || !groups[1].Disabled() {
+		t.Fatalf("unexpected groups: %+v", groups)
+	}
+}
+
 func TestPostMessageUsesJSONPayload(t *testing.T) {
 	t.Parallel()
 
