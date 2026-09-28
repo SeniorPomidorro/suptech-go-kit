@@ -71,6 +71,9 @@ func TestGetConversationListUsesCursorPagination(t *testing.T) {
 		if q.Get("team_id") != "T123" {
 			t.Fatalf("unexpected team_id: %q", q.Get("team_id"))
 		}
+		if q.Get("limit") != "999" {
+			t.Fatalf("expected the largest page Slack allows, got limit %q", q.Get("limit"))
+		}
 
 		requestCount++
 		w.Header().Set("Content-Type", "application/json")

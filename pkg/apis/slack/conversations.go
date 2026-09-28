@@ -13,6 +13,9 @@ type ConversationsService struct {
 	client *Client
 }
 
+// conversationListLimit is the largest page conversations.list accepts ("under 1000"); the default 100 burns the Tier 2 budget on big workspaces.
+const conversationListLimit = "999"
+
 // GetConversationList returns conversations and follows cursor pagination.
 func (s *ConversationsService) GetConversationList(ctx context.Context, excludeArchived bool, channelTypes []string) ([]Conversation, error) {
 	var (
@@ -22,6 +25,7 @@ func (s *ConversationsService) GetConversationList(ctx context.Context, excludeA
 
 	for {
 		params := url.Values{}
+		params.Set("limit", conversationListLimit)
 		if excludeArchived {
 			params.Set("exclude_archived", "true")
 		}
