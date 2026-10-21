@@ -198,6 +198,30 @@ func (s *ConversationsService) GetReplies(ctx context.Context, req *GetRepliesRe
 	return &response, nil
 }
 
+// JoinConversation joins the bot to a public channel; requires the channels:join scope.
+func (s *ConversationsService) JoinConversation(ctx context.Context, channelID string) (*Conversation, error) {
+	if strings.TrimSpace(channelID) == "" {
+		return nil, errors.New("slack: channel ID is required")
+	}
+
+	form := url.Values{}
+	form.Set("channel", channelID)
+	s.client.withTeamID(form)
+
+	req, err := s.client.newFormRequest(ctx, "conversations.join", form)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Channel Conversation `json:"channel"`
+	}
+	if err := s.client.do(req, &response); err != nil {
+		return nil, err
+	}
+	return &response.Channel, nil
+}
+
 // InviteUsersToChannel invites users to a channel.
 func (s *ConversationsService) InviteUsersToChannel(ctx context.Context, userIDs []string, channelID string) (*Conversation, error) {
 	if strings.TrimSpace(channelID) == "" {

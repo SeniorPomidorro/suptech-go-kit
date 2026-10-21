@@ -174,6 +174,30 @@ type AllowedValue struct {
 	GroupID      string `json:"groupId,omitempty"`
 }
 
+// ChangelogEntry is one history record of an issue: who changed what and when.
+type ChangelogEntry struct {
+	ID      string          `json:"id"`
+	Author  *User           `json:"author,omitempty"`
+	Created string          `json:"created"`
+	Items   []ChangelogItem `json:"items"`
+}
+
+// ChangelogItem is a single field change inside a ChangelogEntry.
+type ChangelogItem struct {
+	Field      string `json:"field"`
+	FieldID    string `json:"fieldId,omitempty"`
+	From       string `json:"from,omitempty"`
+	FromString string `json:"fromString,omitempty"`
+	To         string `json:"to,omitempty"`
+	ToString   string `json:"toString,omitempty"`
+}
+
+// changelogPage is one page of GET /rest/api/3/issue/{issueIdOrKey}/changelog.
+type changelogPage struct {
+	Values []ChangelogEntry `json:"values"`
+	IsLast bool             `json:"isLast"`
+}
+
 // TransitionsList is the response of GET /rest/api/3/issue/{issueIdOrKey}/transitions.
 type TransitionsList struct {
 	Expand      string       `json:"expand,omitempty"`

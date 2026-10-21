@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -219,6 +220,35 @@ func (s *IssuesService) UpdateIssue(ctx context.Context, ticketKey string, body 
 	}
 
 	return nil, s.client.doNoResponseBody(req)
+}
+
+// GetChangelog returns the full change history of an issue, oldest first, across all pages.
+func (s *IssuesService) GetChangelog(ctx context.Context, ticketKey string) ([]ChangelogEntry, error) {
+	if strings.TrimSpace(ticketKey) == "" {
+		return nil, errors.New("atlassian: ticket key is required")
+	}
+
+	path := fmt.Sprintf("/rest/api/3/issue/%s/changelog", url.PathEscape(ticketKey))
+	var entries []ChangelogEntry
+	for {
+		query := url.Values{}
+		query.Set("startAt", strconv.Itoa(len(entries)))
+		query.Set("maxResults", "100")
+
+		req, err := s.client.newRequest(ctx, http.MethodGet, path, query, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page changelogPage
+		if err := s.client.transport.DoJSON(req, &page); err != nil {
+			return nil, err
+		}
+		entries = append(entries, page.Values...)
+		if page.IsLast || len(page.Values) == 0 {
+			return entries, nil
+		}
+	}
 }
 
 // GetTransitions returns workflow transitions available on the issue.

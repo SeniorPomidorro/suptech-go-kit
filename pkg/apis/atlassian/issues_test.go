@@ -650,3 +650,36 @@ func TestTransitionsValidation(t *testing.T) {
 	}
 }
 
+
+func TestGetChangelogFetchesAllPages(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/rest/api/3/issue/INC-1/changelog" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Query().Get("startAt") {
+		case "0":
+			_, _ = w.Write([]byte(`{"values":[{"id":"1","created":"2026-10-15T14:16:41.000+0400","items":[{"field":"status","fromString":"Investigating","toString":"Active"}]}],"isLast":false}`))
+		case "1":
+			_, _ = w.Write([]byte(`{"values":[{"id":"2","created":"2026-10-15T14:25:00.000+0400","items":[{"field":"status","fromString":"Active","toString":"Stable"}]}],"isLast":true}`))
+		default:
+			t.Fatalf("unexpected startAt: %q", r.URL.Query().Get("startAt"))
+		}
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	entries, err := client.Issues().GetChangelog(context.Background(), "INC-1")
+	if err != nil {
+		t.Fatalf("GetChangelog: %v", err)
+	}
+	if len(entries) != 2 || entries[1].Items[0].ToString != "Stable" || entries[0].Created != "2026-10-15T14:16:41.000+0400" {
+		t.Fatalf("unexpected entries: %+v", entries)
+	}
+}

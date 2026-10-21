@@ -274,3 +274,39 @@ func TestSlackMethodReturnsTransportAPIErrorOnNon2xx(t *testing.T) {
 		t.Fatalf("unexpected status code: %d", apiErr.StatusCode)
 	}
 }
+
+func TestJoinConversationSendsChannel(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/conversations.join" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		if r.Form.Get("channel") != "C777" {
+			t.Fatalf("unexpected channel: %q", r.Form.Get("channel"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"channel":{"id":"C777","name":"alerts"}}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithToken("xoxb-test"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	channel, err := client.Conversations().JoinConversation(context.Background(), "C777")
+	if err != nil {
+		t.Fatalf("JoinConversation failed: %v", err)
+	}
+	if channel.ID != "C777" {
+		t.Fatalf("unexpected channel id: %q", channel.ID)
+	}
+}

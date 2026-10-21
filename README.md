@@ -165,7 +165,7 @@ _ = raw
 
 ### `pkg/apis/atlassian`
 
-- Issues: `CreateIssue`, `GetIssue`, `UpdateIssue`, `SaveStoryPoints`, `FindIssues` (`FetchAll`), `ManageTags`, `CreateComment`, `AddAttachment`, `GetTransitions`, `DoTransition`
+- Issues: `CreateIssue`, `GetIssue`, `UpdateIssue`, `SaveStoryPoints`, `FindIssues` (`FetchAll`), `ManageTags`, `CreateComment`, `AddAttachment`, `GetChangelog`, `GetTransitions`, `DoTransition`
 - ADF helpers: `TextToADF`, `ADFToText`
 - Users: `FindUsers`, `BulkGetUsers`
 - Assets: `SearchObjectsAQL` (`FetchAll`), `CreateObject`, `DeleteObject`, `UpdateObject`, `GetObject`
@@ -176,7 +176,7 @@ _ = raw
 ### `pkg/apis/slack`
 
 - User groups: `CreateUserGroup`, `ListUserGroups`, `ListUserGroupUsers`, `UpdateUserGroupUsers`
-- Conversations: `GetConversationList`, `CreateConversation`, `GetChannelByID`, `InviteUsersToChannel`, `GetHistory`, `GetReplies`
+- Conversations: `GetConversationList`, `CreateConversation`, `GetChannelByID`, `JoinConversation`, `InviteUsersToChannel`, `GetHistory`, `GetReplies`
 - Messages: `PostMessage`, `PostEphemeralMessage`, `UpdateMessage`
 - Users: `GetUserByID`, `GetUsersByID`, `GetUsersByGroupID`, `GetUserByEmail`, `ListUsers` (`FetchAll`)
 
