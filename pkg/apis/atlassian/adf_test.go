@@ -1012,3 +1012,32 @@ func assertRoundTrip(t *testing.T, input string) {
 		t.Fatalf("round-trip failed:\ninput:  %q\noutput: %q", input, got)
 	}
 }
+
+func TestADFToText_InlineCardURL(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"see "},{"type":"inlineCard","attrs":{"url":"https://x.atlassian.net/browse/PROJ-1"}}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	if got != "see https://x.atlassian.net/browse/PROJ-1" {
+		t.Fatalf("want %q, got %q", "see https://x.atlassian.net/browse/PROJ-1", got)
+	}
+}
+
+func TestADFToText_LinkMarkHref(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"monitor","marks":[{"type":"strong"},{"type":"link","attrs":{"href":"https://dd/m/1"}}]},{"type":"text","text":" and "},{"type":"text","text":"https://dd/m/2","marks":[{"type":"link","attrs":{"href":"https://dd/m/2"}}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "*monitor* (https://dd/m/1) and https://dd/m/2"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+func TestADFToText_LinkMarkSplitRun(t *testing.T) {
+	t.Parallel()
+	adf := `{"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Cloud","marks":[{"type":"strong"},{"type":"link","attrs":{"href":"https://dd/m/1"}}]},{"type":"text","text":"SQL","marks":[{"type":"link","attrs":{"href":"https://dd/m/1"}}]}]}]}`
+	got := ADFToText(json.RawMessage(adf))
+	want := "*Cloud*SQL (https://dd/m/1)"
+	if got != want {
+		t.Fatalf("want %q, got %q", want, got)
+	}
+}

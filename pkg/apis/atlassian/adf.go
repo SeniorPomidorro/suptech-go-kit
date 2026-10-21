@@ -27,15 +27,17 @@ const (
 )
 
 type adfMark struct {
-	Type string `json:"type"`
+	Type  string         `json:"type"`
+	Attrs map[string]any `json:"attrs,omitempty"`
 }
 
 type adfNode struct {
-	Type    string    `json:"type"`
-	Version int       `json:"version,omitempty"`
-	Text    string    `json:"text,omitempty"`
-	Marks   []adfMark `json:"marks,omitempty"`
-	Content []adfNode `json:"content,omitempty"`
+	Type    string         `json:"type"`
+	Version int            `json:"version,omitempty"`
+	Text    string         `json:"text,omitempty"`
+	Marks   []adfMark      `json:"marks,omitempty"`
+	Content []adfNode      `json:"content,omitempty"`
+	Attrs   map[string]any `json:"attrs,omitempty"`
 }
 
 // Inline marker definitions: delimiter → ADF mark type.
@@ -361,7 +363,7 @@ var markToDelim = map[string]byte{
 }
 
 func renderInlineNodes(b *strings.Builder, nodes []adfNode) {
-	for _, node := range nodes {
+	for i, node := range nodes {
 		switch {
 		case node.Type == adfTypeHardBreak:
 			b.WriteByte('\n')
@@ -381,6 +383,11 @@ func renderInlineNodes(b *strings.Builder, nodes []adfNode) {
 			for j := len(cl) - 1; j >= 0; j-- {
 				b.WriteByte(cl[j])
 			}
+			// the text would lose a hyperlink's target, so keep it once after the linked run
+			href := linkHref(node.Marks)
+			if href != "" && href != node.Text && (i+1 == len(nodes) || linkHref(nodes[i+1].Marks) != href) {
+				b.WriteString(" (" + href + ")")
+			}
 		default:
 			// Unknown inline nodes (mention, emoji, inlineCard, etc.):
 			// extract any nested text or fall back to node's own text field.
@@ -389,9 +396,21 @@ func renderInlineNodes(b *strings.Builder, nodes []adfNode) {
 			}
 			if len(node.Content) > 0 {
 				renderInlineNodes(b, node.Content)
+			} else if url, ok := node.Attrs["url"].(string); ok && node.Text == "" {
+				b.WriteString(url)
 			}
 		}
 	}
+}
+
+func linkHref(marks []adfMark) string {
+	for _, m := range marks {
+		if m.Type == "link" {
+			href, _ := m.Attrs["href"].(string)
+			return href
+		}
+	}
+	return ""
 }
 
 func extractPlainText(b *strings.Builder, nodes []adfNode) {

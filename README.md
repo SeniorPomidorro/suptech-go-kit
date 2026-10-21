@@ -195,7 +195,7 @@ _ = raw
 Jira API v3 requires rich text fields (`description`, `environment`, and some custom fields) to be in [Atlassian Document Format (ADF)](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/). The package provides two helpers for basic text conversion:
 
 - `TextToADF(text)` — converts text with inline formatting to ADF (`json.RawMessage`). Supports `*bold*`, `_italic_`, `+underline+`, `` `code` ``, and ` ``` ` code blocks.
-- `ADFToText(adf)` — extracts text from ADF, restoring inline formatting markers. Unknown marks (links, etc.) are silently ignored.
+- `ADFToText(adf)` — extracts text from ADF, restoring inline formatting markers. Inline cards render as their URL, linked text as `text (href)`; other unknown marks are ignored.
 
 ```go
 // Update description with plain text converted to ADF
