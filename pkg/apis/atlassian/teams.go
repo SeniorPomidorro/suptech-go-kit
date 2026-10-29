@@ -88,7 +88,7 @@ func (s *TeamsService) LinkTeam(ctx context.Context, orgID, teamID, siteID strin
 	if ref.Source == "" || strings.TrimSpace(ref.ID) == "" {
 		return errors.New("atlassian: external reference source and ID are required")
 	}
-	path, err := teamsPath(orgID, "/"+teamID+"/external/link")
+	path, err := teamPath(orgID, teamID, "/external/link")
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (s *TeamsService) DeleteTeam(ctx context.Context, orgID, teamID, siteID str
 	if strings.TrimSpace(teamID) == "" {
 		return errors.New("atlassian: team ID is required")
 	}
-	path, err := teamsPath(orgID, "/"+teamID)
+	path, err := teamPath(orgID, teamID, "")
 	if err != nil {
 		return err
 	}
@@ -127,6 +127,21 @@ func teamsPath(orgID, suffix string) (string, error) {
 	if strings.TrimSpace(orgID) == "" {
 		return "", errors.New("atlassian: organisation ID is required")
 	}
+	if !pathSegment(orgID) {
+		return "", fmt.Errorf("atlassian: organisation ID %q is not a single path segment", orgID)
+	}
 	// unescaped: the request URL escapes its path itself
 	return "/gateway/api/public/teams/v1/org/" + orgID + "/teams" + suffix, nil
+}
+
+func teamPath(orgID, teamID, suffix string) (string, error) {
+	if !pathSegment(teamID) {
+		return "", fmt.Errorf("atlassian: team ID %q is not a single path segment", teamID)
+	}
+	return teamsPath(orgID, "/"+teamID+suffix)
+}
+
+// pathSegment rejects ids that would leave their segment: a slash, or a dot segment the URL resolution collapses.
+func pathSegment(id string) bool {
+	return !strings.ContainsAny(id, "/\\") && id != "." && id != ".."
 }

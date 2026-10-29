@@ -227,4 +227,15 @@ func TestTeamsValidation(t *testing.T) {
 	if err := teams.DeleteTeam(ctx, "org-1", " ", ""); err == nil {
 		t.Fatal("expected an error without a team id")
 	}
+	for _, id := range []string{"..", ".", "../../other", "t/1", `t\1`} {
+		if err := teams.DeleteTeam(ctx, "org-1", id, ""); err == nil {
+			t.Fatalf("expected an error for team id %q", id)
+		}
+		if err := teams.LinkTeam(ctx, "org-1", id, "", TeamExternalReference{Source: TeamSourceGroup, ID: "g1"}); err == nil {
+			t.Fatalf("expected an error for team id %q", id)
+		}
+	}
+	if _, err := teams.ListTeams(ctx, "../org", ""); err == nil {
+		t.Fatal("expected an error for an organisation id with a slash")
+	}
 }
