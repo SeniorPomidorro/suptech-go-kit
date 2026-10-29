@@ -6,7 +6,7 @@
 
 `suptech-go-kit` is a Go toolkit of API clients for common engineering integrations:
 
-- Atlassian (Jira Issues/Users, Jira Assets, Jira Operations)
+- Atlassian (Jira Issues/Users, Jira Assets, Jira Operations, Atlassian Teams)
 - Slack (MVP + Iteration 2: Views, Canvas, Socket Mode)
 - GitLab (raw file download)
 - Shared HTTP transport with retry/timeout/error handling
@@ -172,6 +172,7 @@ _ = raw
   - Structured request types: `CreateAssetObjectRequest`, `UpdateAssetObjectRequest`
   - Simplified factory functions: `NewCreateAssetObjectRequest`, `NewUpdateAssetObjectRequest`
 - Operations: `CreateAlert`, `GetAlert`, `ListAlerts`, `EnableOpsForTeam`, `ListTeams`, `ListNotificationRules`, `ListSchedules`, `GetSchedule`, `ListOnCalls`
+- Teams (Atlassian teams behind the Jira Team field, through the site gateway): `ListTeams`, `CreateTeam`, `LinkTeam` (sync members from a group), `DeleteTeam`. `CreateTeam` is never retried, since a replayed create makes a second team
 
 ### `pkg/apis/slack`
 

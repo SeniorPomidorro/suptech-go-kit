@@ -61,6 +61,7 @@ type Client struct {
 	users      *UsersService
 	assets     *AssetsService
 	operations *OperationsService
+	teams      *TeamsService
 }
 
 // NewClient creates Atlassian client.
@@ -116,6 +117,7 @@ func NewClient(opts ...Option) (*Client, error) {
 	client.users = &UsersService{client: client}
 	client.assets = &AssetsService{client: client}
 	client.operations = &OperationsService{client: client}
+	client.teams = &TeamsService{client: client}
 
 	return client, nil
 }
@@ -195,6 +197,11 @@ func (c *Client) Assets() *AssetsService {
 // Operations returns Jira Operations API service.
 func (c *Client) Operations() *OperationsService {
 	return c.operations
+}
+
+// Teams returns Atlassian Teams API service.
+func (c *Client) Teams() *TeamsService {
+	return c.teams
 }
 
 // newRequest creates an HTTP request resolved against the Jira base URL (issues, users, etc.).
