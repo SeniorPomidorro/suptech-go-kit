@@ -37,5 +37,5 @@ type CreateTeamRequest struct {
 	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
 	TeamType    string `json:"teamType"`
-	SiteID      string `json:"siteId,omitempty"`
+	SiteID      string `json:"siteId"`
 }
