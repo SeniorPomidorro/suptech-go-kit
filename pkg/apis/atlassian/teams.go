@@ -104,7 +104,7 @@ func (s *TeamsService) LinkTeam(ctx context.Context, orgID, teamID, siteID strin
 }
 
 // RenameTeam sets the team's display name and returns the team as the API has it now; the description stays.
-func (s *TeamsService) RenameTeam(ctx context.Context, orgID, teamID, displayName string) (*OrgTeam, error) {
+func (s *TeamsService) RenameTeam(ctx context.Context, orgID, teamID, siteID, displayName string) (*OrgTeam, error) {
 	if strings.TrimSpace(teamID) == "" {
 		return nil, errors.New("atlassian: team ID is required")
 	}
@@ -115,7 +115,11 @@ func (s *TeamsService) RenameTeam(ctx context.Context, orgID, teamID, displayNam
 	if err != nil {
 		return nil, err
 	}
-	req, err := s.client.newRequest(ctx, http.MethodPatch, path, nil, map[string]string{"displayName": strings.TrimSpace(displayName)})
+	var query url.Values
+	if siteID != "" {
+		query = url.Values{"siteId": {siteID}}
+	}
+	req, err := s.client.newRequest(ctx, http.MethodPatch, path, query, map[string]string{"displayName": strings.TrimSpace(displayName)})
 	if err != nil {
 		return nil, err
 	}

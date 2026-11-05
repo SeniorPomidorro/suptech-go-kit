@@ -181,7 +181,7 @@ func TestRenameTeam(t *testing.T) {
 	t.Parallel()
 
 	client := newTeamsClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch || r.URL.Path != teamsBase+"/t9" || r.URL.RawQuery != "" {
+		if r.Method != http.MethodPatch || r.URL.Path != teamsBase+"/t9" || r.URL.Query().Get("siteId") != "site-1" {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL)
 		}
 		var body map[string]any
@@ -195,7 +195,7 @@ func TestRenameTeam(t *testing.T) {
 		_, _ = w.Write([]byte(`{"teamId":"t9","displayName":"Loans 2","description":"kept","state":"ACTIVE"}`))
 	})
 
-	team, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", " Loans 2 ")
+	team, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", "site-1", " Loans 2 ")
 	if err != nil {
 		t.Fatalf("RenameTeam: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestRenameTeamRefusesAnEmptyAnswer(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	if _, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", "Loans"); err == nil {
+	if _, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", "site-1", "Loans"); err == nil {
 		t.Fatal("expected an error for a response without the team")
 	}
 }
@@ -263,16 +263,16 @@ func TestTeamsValidation(t *testing.T) {
 	if err := teams.LinkTeam(ctx, "org-1", "t9", "", TeamExternalReference{Source: TeamSourceGroup}); err == nil {
 		t.Fatal("expected an error without a reference id")
 	}
-	if _, err := teams.RenameTeam(ctx, "org-1", "t9", " "); err == nil {
+	if _, err := teams.RenameTeam(ctx, "org-1", "t9", "", " "); err == nil {
 		t.Fatal("expected an error without a new name")
 	}
-	if _, err := teams.RenameTeam(ctx, "org-1", "", "Loans"); err == nil {
+	if _, err := teams.RenameTeam(ctx, "org-1", "", "", "Loans"); err == nil {
 		t.Fatal("expected an error without a team id")
 	}
-	if _, err := teams.RenameTeam(ctx, "", "t9", "Loans"); err == nil {
+	if _, err := teams.RenameTeam(ctx, "", "t9", "", "Loans"); err == nil {
 		t.Fatal("expected an error without an organisation")
 	}
-	if _, err := teams.RenameTeam(ctx, "../org", "t9", "Loans"); err == nil {
+	if _, err := teams.RenameTeam(ctx, "../org", "t9", "", "Loans"); err == nil {
 		t.Fatal("expected an error for an organisation id with a slash")
 	}
 	if err := teams.DeleteTeam(ctx, "org-1", " ", ""); err == nil {
@@ -282,7 +282,7 @@ func TestTeamsValidation(t *testing.T) {
 		if err := teams.DeleteTeam(ctx, "org-1", id, ""); err == nil {
 			t.Fatalf("expected an error for team id %q", id)
 		}
-		if _, err := teams.RenameTeam(ctx, "org-1", id, "Loans"); err == nil {
+		if _, err := teams.RenameTeam(ctx, "org-1", id, "", "Loans"); err == nil {
 			t.Fatalf("expected an error for team id %q", id)
 		}
 		if err := teams.LinkTeam(ctx, "org-1", id, "", TeamExternalReference{Source: TeamSourceGroup, ID: "g1"}); err == nil {
