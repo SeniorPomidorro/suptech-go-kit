@@ -103,6 +103,29 @@ func (s *TeamsService) LinkTeam(ctx context.Context, orgID, teamID, siteID strin
 	return s.client.doNoResponseBody(req)
 }
 
+// RenameTeam sets the team's display name and returns the team as the API has it now; the description stays.
+func (s *TeamsService) RenameTeam(ctx context.Context, orgID, teamID, displayName string) (*OrgTeam, error) {
+	if strings.TrimSpace(teamID) == "" {
+		return nil, errors.New("atlassian: team ID is required")
+	}
+	if strings.TrimSpace(displayName) == "" {
+		return nil, errors.New("atlassian: team display name is required")
+	}
+	path, err := teamPath(orgID, teamID, "")
+	if err != nil {
+		return nil, err
+	}
+	req, err := s.client.newRequest(ctx, http.MethodPatch, path, nil, map[string]string{"displayName": displayName})
+	if err != nil {
+		return nil, err
+	}
+	var team OrgTeam
+	if err := s.client.transport.DoJSON(req, &team); err != nil {
+		return nil, err
+	}
+	return &team, nil
+}
+
 // DeleteTeam deletes a team.
 func (s *TeamsService) DeleteTeam(ctx context.Context, orgID, teamID, siteID string) error {
 	if strings.TrimSpace(teamID) == "" {

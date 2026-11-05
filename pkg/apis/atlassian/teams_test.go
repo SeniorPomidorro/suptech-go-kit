@@ -177,6 +177,33 @@ func TestLinkTeam(t *testing.T) {
 	}
 }
 
+func TestRenameTeam(t *testing.T) {
+	t.Parallel()
+
+	client := newTeamsClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch || r.URL.Path != teamsBase+"/t9" || r.URL.RawQuery != "" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if len(body) != 1 || body["displayName"] != "Loans 2" {
+			t.Fatalf("unexpected body: %+v", body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"teamId":"t9","displayName":"Loans 2","description":"kept","state":"ACTIVE"}`))
+	})
+
+	team, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", "Loans 2")
+	if err != nil {
+		t.Fatalf("RenameTeam: %v", err)
+	}
+	if team.TeamID != "t9" || team.DisplayName != "Loans 2" || team.Description != "kept" {
+		t.Fatalf("unexpected team: %+v", team)
+	}
+}
+
 func TestDeleteTeam(t *testing.T) {
 	t.Parallel()
 
@@ -224,11 +251,20 @@ func TestTeamsValidation(t *testing.T) {
 	if err := teams.LinkTeam(ctx, "org-1", "t9", "", TeamExternalReference{Source: TeamSourceGroup}); err == nil {
 		t.Fatal("expected an error without a reference id")
 	}
+	if _, err := teams.RenameTeam(ctx, "org-1", "t9", " "); err == nil {
+		t.Fatal("expected an error without a new name")
+	}
+	if _, err := teams.RenameTeam(ctx, "org-1", "", "Loans"); err == nil {
+		t.Fatal("expected an error without a team id")
+	}
 	if err := teams.DeleteTeam(ctx, "org-1", " ", ""); err == nil {
 		t.Fatal("expected an error without a team id")
 	}
 	for _, id := range []string{"..", ".", "../../other", "t/1", `t\1`} {
 		if err := teams.DeleteTeam(ctx, "org-1", id, ""); err == nil {
+			t.Fatalf("expected an error for team id %q", id)
+		}
+		if _, err := teams.RenameTeam(ctx, "org-1", id, "Loans"); err == nil {
 			t.Fatalf("expected an error for team id %q", id)
 		}
 		if err := teams.LinkTeam(ctx, "org-1", id, "", TeamExternalReference{Source: TeamSourceGroup, ID: "g1"}); err == nil {
