@@ -18,7 +18,8 @@ type TeamsService struct {
 
 // ListTeams returns every team of the organisation on the site, following the cursor until it is empty.
 func (s *TeamsService) ListTeams(ctx context.Context, orgID, siteID string) ([]OrgTeam, error) {
-	if err := requireSite(siteID); err != nil {
+	siteID, err := site(siteID)
+	if err != nil {
 		return nil, err
 	}
 	path, err := teamsPath(orgID, "")
@@ -63,14 +64,17 @@ func (s *TeamsService) CreateTeam(ctx context.Context, orgID string, body *Creat
 	if body.TeamType == "" {
 		return nil, errors.New("atlassian: team type is required")
 	}
-	if err := requireSite(body.SiteID); err != nil {
+	siteID, err := site(body.SiteID)
+	if err != nil {
 		return nil, err
 	}
+	trimmed := *body
+	trimmed.DisplayName, trimmed.SiteID = strings.TrimSpace(body.DisplayName), siteID
 	path, err := teamsPath(orgID, "")
 	if err != nil {
 		return nil, err
 	}
-	req, err := s.client.newRequest(ctx, http.MethodPost, path, nil, body)
+	req, err := s.client.newRequest(ctx, http.MethodPost, path, nil, &trimmed)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +83,9 @@ func (s *TeamsService) CreateTeam(ctx context.Context, orgID string, body *Creat
 	var team OrgTeam
 	if err := s.client.transport.DoJSON(req, &team); err != nil {
 		return nil, err
+	}
+	if team.TeamID == "" {
+		return nil, errors.New("atlassian: creating a team: no team in the response, it may exist already")
 	}
 	return &team, nil
 }
@@ -91,7 +98,8 @@ func (s *TeamsService) LinkTeam(ctx context.Context, orgID, teamID, siteID strin
 	if ref.Source == "" || strings.TrimSpace(ref.ID) == "" {
 		return errors.New("atlassian: external reference source and ID are required")
 	}
-	if err := requireSite(siteID); err != nil {
+	siteID, err := site(siteID)
+	if err != nil {
 		return err
 	}
 	path, err := teamPath(orgID, teamID, "/external/link")
@@ -121,7 +129,8 @@ func (s *TeamsService) RenameTeam(ctx context.Context, orgID, teamID, siteID, di
 	if err != nil {
 		return nil, err
 	}
-	if err := requireSite(siteID); err != nil {
+	siteID, err = site(siteID)
+	if err != nil {
 		return nil, err
 	}
 	query := url.Values{"siteId": {siteID}}
@@ -148,7 +157,8 @@ func (s *TeamsService) DeleteTeam(ctx context.Context, orgID, teamID, siteID str
 	if err != nil {
 		return err
 	}
-	if err := requireSite(siteID); err != nil {
+	siteID, err = site(siteID)
+	if err != nil {
 		return err
 	}
 	query := url.Values{"siteId": {siteID}}
@@ -159,12 +169,12 @@ func (s *TeamsService) DeleteTeam(ctx context.Context, orgID, teamID, siteID str
 	return s.client.doNoResponseBody(req)
 }
 
-// requireSite refuses a call without the site: the API answers without it on some calls only, though its spec calls it optional everywhere.
-func requireSite(siteID string) error {
-	if strings.TrimSpace(siteID) == "" {
-		return errors.New("atlassian: site ID is required")
+// site returns the trimmed site id and refuses an empty one: the API needs it on some calls, though its spec calls it optional everywhere.
+func site(siteID string) (string, error) {
+	if siteID = strings.TrimSpace(siteID); siteID == "" {
+		return "", errors.New("atlassian: site ID is required")
 	}
-	return nil
+	return siteID, nil
 }
 
 func teamsPath(orgID, suffix string) (string, error) {

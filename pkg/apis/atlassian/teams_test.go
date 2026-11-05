@@ -195,7 +195,7 @@ func TestRenameTeam(t *testing.T) {
 		_, _ = w.Write([]byte(`{"teamId":"t9","displayName":"Loans 2","description":"kept","state":"ACTIVE"}`))
 	})
 
-	team, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", "site-1", " Loans 2 ")
+	team, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", " site-1\n", " Loans 2 ")
 	if err != nil {
 		t.Fatalf("RenameTeam: %v", err)
 	}
@@ -204,15 +204,24 @@ func TestRenameTeam(t *testing.T) {
 	}
 }
 
-func TestRenameTeamRefusesAnEmptyAnswer(t *testing.T) {
+func TestTeamWritesRefuseAnEmptyAnswer(t *testing.T) {
 	t.Parallel()
 
-	client := newTeamsClient(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-
-	if _, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", "site-1", "Loans"); err == nil {
-		t.Fatal("expected an error for a response without the team")
+	for _, body := range []string{"", "{}"} {
+		client := newTeamsClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if body == "" {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(body))
+		})
+		if _, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", "site-1", "Loans"); err == nil {
+			t.Fatalf("rename: expected an error for the answer %q", body)
+		}
+		if _, err := client.Teams().CreateTeam(context.Background(), "org-1", &CreateTeamRequest{DisplayName: "Loans", TeamType: TeamTypeOpen, SiteID: "site-1"}); err == nil {
+			t.Fatalf("create: expected an error for the answer %q", body)
+		}
 	}
 }
 
