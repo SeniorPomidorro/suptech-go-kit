@@ -115,13 +115,16 @@ func (s *TeamsService) RenameTeam(ctx context.Context, orgID, teamID, displayNam
 	if err != nil {
 		return nil, err
 	}
-	req, err := s.client.newRequest(ctx, http.MethodPatch, path, nil, map[string]string{"displayName": displayName})
+	req, err := s.client.newRequest(ctx, http.MethodPatch, path, nil, map[string]string{"displayName": strings.TrimSpace(displayName)})
 	if err != nil {
 		return nil, err
 	}
 	var team OrgTeam
 	if err := s.client.transport.DoJSON(req, &team); err != nil {
 		return nil, err
+	}
+	if team.TeamID == "" {
+		return nil, fmt.Errorf("atlassian: renaming team %s: no team in the response", teamID)
 	}
 	return &team, nil
 }
