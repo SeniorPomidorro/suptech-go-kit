@@ -83,7 +83,7 @@ func TestListTeamsPaging(t *testing.T) {
 				_, _ = w.Write([]byte(c.pages[r.URL.Query().Get("cursor")]))
 			})
 
-			teams, err := client.Teams().ListTeams(context.Background(), "org-1", "")
+			teams, err := client.Teams().ListTeams(context.Background(), "org-1", "site-1")
 			if (err != nil) != c.wantErr || len(teams) != c.want {
 				t.Fatalf("got %d teams, err %v", len(teams), err)
 			}
@@ -142,7 +142,7 @@ func TestCreateTeamIsNeverRetried(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	_, err = client.Teams().CreateTeam(context.Background(), "org-1", &CreateTeamRequest{DisplayName: "Loans", TeamType: TeamTypeOpen})
+	_, err = client.Teams().CreateTeam(context.Background(), "org-1", &CreateTeamRequest{DisplayName: "Loans", TeamType: TeamTypeOpen, SiteID: "site-1"})
 	var apiErr *transport.APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected a 503 api error, got %v", err)
@@ -174,6 +174,54 @@ func TestLinkTeam(t *testing.T) {
 
 	if err := client.Teams().LinkTeam(context.Background(), "org-1", "t9", "site-1", TeamExternalReference{Source: TeamSourceGroup, ID: "g1"}); err != nil {
 		t.Fatalf("LinkTeam: %v", err)
+	}
+}
+
+func TestRenameTeam(t *testing.T) {
+	t.Parallel()
+
+	client := newTeamsClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch || r.URL.Path != teamsBase+"/t9" || r.URL.Query().Get("siteId") != "site-1" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if len(body) != 1 || body["displayName"] != "Loans 2" {
+			t.Fatalf("unexpected body: %+v", body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"teamId":"t9","displayName":"Loans 2","description":"kept","state":"ACTIVE"}`))
+	})
+
+	team, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", " site-1\n", " Loans 2 ")
+	if err != nil {
+		t.Fatalf("RenameTeam: %v", err)
+	}
+	if team.TeamID != "t9" || team.DisplayName != "Loans 2" || team.Description != "kept" {
+		t.Fatalf("unexpected team: %+v", team)
+	}
+}
+
+func TestTeamWritesRefuseAnEmptyAnswer(t *testing.T) {
+	t.Parallel()
+
+	for _, body := range []string{"", "{}"} {
+		client := newTeamsClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if body == "" {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(body))
+		})
+		if _, err := client.Teams().RenameTeam(context.Background(), "org-1", "t9", "site-1", "Loans"); err == nil {
+			t.Fatalf("rename: expected an error for the answer %q", body)
+		}
+		if _, err := client.Teams().CreateTeam(context.Background(), "org-1", &CreateTeamRequest{DisplayName: "Loans", TeamType: TeamTypeOpen, SiteID: "site-1"}); err == nil {
+			t.Fatalf("create: expected an error for the answer %q", body)
+		}
 	}
 }
 
@@ -212,30 +260,60 @@ func TestTeamsValidation(t *testing.T) {
 	teams := client.Teams()
 	ctx := context.Background()
 
+	if _, err := teams.ListTeams(ctx, "org-1", " "); err == nil {
+		t.Fatal("expected an error without a site")
+	}
+	if _, err := teams.CreateTeam(ctx, "org-1", &CreateTeamRequest{DisplayName: "Loans", TeamType: TeamTypeOpen}); err == nil {
+		t.Fatal("expected an error without a site")
+	}
+	if err := teams.LinkTeam(ctx, "org-1", "t9", "", TeamExternalReference{Source: TeamSourceGroup, ID: "g1"}); err == nil {
+		t.Fatal("expected an error without a site")
+	}
+	if _, err := teams.RenameTeam(ctx, "org-1", "t9", "", "Loans"); err == nil {
+		t.Fatal("expected an error without a site")
+	}
+	if err := teams.DeleteTeam(ctx, "org-1", "t9", ""); err == nil {
+		t.Fatal("expected an error without a site")
+	}
 	if _, err := teams.ListTeams(ctx, "", "site-1"); err == nil {
 		t.Fatal("expected an error without an organisation")
 	}
-	if _, err := teams.CreateTeam(ctx, "org-1", &CreateTeamRequest{TeamType: TeamTypeOpen}); err == nil {
+	if _, err := teams.CreateTeam(ctx, "org-1", &CreateTeamRequest{TeamType: TeamTypeOpen, SiteID: "site-1"}); err == nil {
 		t.Fatal("expected an error without a display name")
 	}
-	if _, err := teams.CreateTeam(ctx, "org-1", &CreateTeamRequest{DisplayName: "Loans"}); err == nil {
+	if _, err := teams.CreateTeam(ctx, "org-1", &CreateTeamRequest{DisplayName: "Loans", SiteID: "site-1"}); err == nil {
 		t.Fatal("expected an error without a team type")
 	}
-	if err := teams.LinkTeam(ctx, "org-1", "t9", "", TeamExternalReference{Source: TeamSourceGroup}); err == nil {
+	if err := teams.LinkTeam(ctx, "org-1", "t9", "site-1", TeamExternalReference{Source: TeamSourceGroup}); err == nil {
 		t.Fatal("expected an error without a reference id")
 	}
-	if err := teams.DeleteTeam(ctx, "org-1", " ", ""); err == nil {
+	if _, err := teams.RenameTeam(ctx, "org-1", "t9", "site-1", " "); err == nil {
+		t.Fatal("expected an error without a new name")
+	}
+	if _, err := teams.RenameTeam(ctx, "org-1", "", "site-1", "Loans"); err == nil {
+		t.Fatal("expected an error without a team id")
+	}
+	if _, err := teams.RenameTeam(ctx, "", "t9", "site-1", "Loans"); err == nil {
+		t.Fatal("expected an error without an organisation")
+	}
+	if _, err := teams.RenameTeam(ctx, "../org", "t9", "site-1", "Loans"); err == nil {
+		t.Fatal("expected an error for an organisation id with a slash")
+	}
+	if err := teams.DeleteTeam(ctx, "org-1", " ", "site-1"); err == nil {
 		t.Fatal("expected an error without a team id")
 	}
 	for _, id := range []string{"..", ".", "../../other", "t/1", `t\1`} {
-		if err := teams.DeleteTeam(ctx, "org-1", id, ""); err == nil {
+		if err := teams.DeleteTeam(ctx, "org-1", id, "site-1"); err == nil {
 			t.Fatalf("expected an error for team id %q", id)
 		}
-		if err := teams.LinkTeam(ctx, "org-1", id, "", TeamExternalReference{Source: TeamSourceGroup, ID: "g1"}); err == nil {
+		if _, err := teams.RenameTeam(ctx, "org-1", id, "site-1", "Loans"); err == nil {
+			t.Fatalf("expected an error for team id %q", id)
+		}
+		if err := teams.LinkTeam(ctx, "org-1", id, "site-1", TeamExternalReference{Source: TeamSourceGroup, ID: "g1"}); err == nil {
 			t.Fatalf("expected an error for team id %q", id)
 		}
 	}
-	if _, err := teams.ListTeams(ctx, "../org", ""); err == nil {
+	if _, err := teams.ListTeams(ctx, "../org", "site-1"); err == nil {
 		t.Fatal("expected an error for an organisation id with a slash")
 	}
 }
