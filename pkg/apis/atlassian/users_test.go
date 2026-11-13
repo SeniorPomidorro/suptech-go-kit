@@ -188,3 +188,52 @@ func TestBulkGetUsersFetchAll(t *testing.T) {
 		t.Fatalf("expected nextPage empty, got %q", result.NextPage)
 	}
 }
+
+func TestListGroupMembers(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/api/3/group/member" {
+			t.Fatalf("unexpected path: %q", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("groupId"); got != "grp-1" {
+			t.Fatalf("unexpected groupId: %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Query().Get("startAt") {
+		case "0":
+			_, _ = w.Write([]byte(`{"startAt":0,"isLast":false,"values":[{"accountId":"a1","emailAddress":"one@example.com"},{"accountId":"a2"}]}`))
+		case "2":
+			_, _ = w.Write([]byte(`{"startAt":2,"isLast":true,"values":[{"accountId":"a3"}]}`))
+		default:
+			t.Fatalf("unexpected startAt: %q", r.URL.Query().Get("startAt"))
+		}
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(WithBaseURL(srv.URL), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	members, err := client.Users().ListGroupMembers(context.Background(), " grp-1 ")
+	if err != nil {
+		t.Fatalf("ListGroupMembers: %v", err)
+	}
+	if len(members) != 3 || members[0].Email != "one@example.com" || members[2].AccountID != "a3" {
+		t.Fatalf("unexpected members: %+v", members)
+	}
+}
+
+func TestListGroupMembersRequiresGroupID(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(WithBaseURL("https://example.atlassian.net"), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	if _, err := client.Users().ListGroupMembers(context.Background(), "  "); err == nil {
+		t.Fatal("expected error for empty group ID")
+	}
+}
