@@ -216,7 +216,10 @@ func TestListGroupMembers(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	members, err := client.Users().ListGroupMembers(context.Background(), " grp-1 ")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	members, err := client.Users().ListGroupMembers(ctx, " grp-1 ")
 	if err != nil {
 		t.Fatalf("ListGroupMembers: %v", err)
 	}
@@ -235,5 +238,54 @@ func TestListGroupMembersRequiresGroupID(t *testing.T) {
 
 	if _, err := client.Users().ListGroupMembers(context.Background(), "  "); err == nil {
 		t.Fatal("expected error for empty group ID")
+	}
+}
+
+func TestListGroupMembersStopsWithoutIsLast(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		pages map[string]string
+	}{
+		"empty_page_ends_listing": {pages: map[string]string{
+			"0": `{"values":[{"accountId":"a1"},{"accountId":"a2"}]}`,
+			"2": `{"values":[]}`,
+		}},
+		"total_reached_ends_listing": {pages: map[string]string{
+			"0": `{"total":2,"values":[{"accountId":"a1"},{"accountId":"a2"}]}`,
+		}},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, ok := tt.pages[r.URL.Query().Get("startAt")]
+				if !ok {
+					t.Errorf("unexpected startAt: %q", r.URL.Query().Get("startAt"))
+					http.Error(w, "unexpected page", http.StatusBadRequest)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(body))
+			}))
+			defer srv.Close()
+
+			client, err := NewClient(WithBaseURL(srv.URL), WithTransport(transport.New()))
+			if err != nil {
+				t.Fatalf("new client: %v", err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			members, err := client.Users().ListGroupMembers(ctx, "grp-1")
+			if err != nil {
+				t.Fatalf("ListGroupMembers: %v", err)
+			}
+			if len(members) != 2 {
+				t.Fatalf("expected 2 members, got %d", len(members))
+			}
+		})
 	}
 }

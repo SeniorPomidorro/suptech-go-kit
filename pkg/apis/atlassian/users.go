@@ -168,10 +168,10 @@ func (s *UsersService) ListGroupMembers(ctx context.Context, groupID string) ([]
 		}
 
 		members = append(members, page.Values...)
-		if page.IsLast || len(page.Values) == 0 {
+		startAt += len(page.Values)
+		if page.IsLast || len(page.Values) == 0 || (page.Total > 0 && startAt >= page.Total) {
 			return members, nil
 		}
-		startAt += len(page.Values)
 	}
 }
 
