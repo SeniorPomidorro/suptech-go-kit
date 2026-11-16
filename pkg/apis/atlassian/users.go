@@ -143,6 +143,38 @@ func (s *UsersService) BulkGetUsers(ctx context.Context, opts *BulkGetUsersOptio
 	}
 }
 
+// ListGroupMembers returns every active member of a Jira group, following pagination.
+func (s *UsersService) ListGroupMembers(ctx context.Context, groupID string) ([]User, error) {
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return nil, errors.New("atlassian: group ID is required")
+	}
+
+	var members []User
+	startAt := 0
+	for {
+		params := url.Values{}
+		params.Set("groupId", groupID)
+		params.Set("startAt", strconv.Itoa(startAt))
+
+		req, err := s.client.newRequest(ctx, http.MethodGet, "/rest/api/3/group/member", params, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page BulkUsersResult
+		if err := s.client.transport.DoJSON(req, &page); err != nil {
+			return nil, err
+		}
+
+		members = append(members, page.Values...)
+		startAt += len(page.Values)
+		if page.IsLast || len(page.Values) == 0 || (page.Total > 0 && startAt >= page.Total) {
+			return members, nil
+		}
+	}
+}
+
 func sleepWithContext(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
 		return nil

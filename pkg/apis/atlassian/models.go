@@ -54,7 +54,7 @@ type BulkGetUsersOptions struct {
 	FetchAllThrottle time.Duration
 }
 
-// BulkUsersResult is a paginated response from GET /rest/api/3/user/bulk.
+// BulkUsersResult is a paginated user page from GET /rest/api/3/user/bulk and GET /rest/api/3/group/member.
 type BulkUsersResult struct {
 	Self       string `json:"self,omitempty"`
 	NextPage   string `json:"nextPage,omitempty"`
