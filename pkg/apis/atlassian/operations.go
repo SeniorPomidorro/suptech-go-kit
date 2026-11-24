@@ -260,7 +260,7 @@ func (s *OperationsService) ListOnCalls(ctx context.Context, scheduleID string, 
 	return &result, nil
 }
 
-// GetTimeline returns a schedule's on-call periods for a window, overrides and forwarding applied in FinalTimeline.
+// GetTimeline returns a schedule's final on-call periods for a window, overrides and forwarding applied.
 func (s *OperationsService) GetTimeline(ctx context.Context, scheduleID string, opts *GetTimelineOptions) (*ScheduleTimeline, error) {
 	if strings.TrimSpace(scheduleID) == "" {
 		return nil, errors.New("atlassian: schedule ID is required")
@@ -284,9 +284,6 @@ func (s *OperationsService) GetTimeline(ctx context.Context, scheduleID string, 
 	}
 	if strings.TrimSpace(opts.IntervalUnit) != "" {
 		query.Set("intervalUnit", opts.IntervalUnit)
-	}
-	for _, e := range opts.Expand {
-		query.Add("expand", e)
 	}
 
 	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)

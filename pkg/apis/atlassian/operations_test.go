@@ -251,12 +251,11 @@ func TestOperationsGetTimeline(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/jsm/ops/api/cloud-1/v1/schedules/sch-1/timeline" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
 		q := r.URL.Query()
-		if q.Get("date") != "2026-11-30T00:00:00+03:00" || q.Get("interval") != "7" || q.Get("intervalUnit") != "days" {
-			t.Fatalf("unexpected query: %s", r.URL.RawQuery)
+		if r.URL.Path != "/jsm/ops/api/cloud-1/v1/schedules/sch-1/timeline" || q.Get("date") != "2026-11-30T00:00:00+03:00" || q.Get("interval") != "7" || q.Get("intervalUnit") != "days" {
+			t.Errorf("unexpected request: %s?%s", r.URL.Path, r.URL.RawQuery)
+			http.Error(w, "unexpected request", http.StatusBadRequest)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"startDate":"2026-11-29T21:00:00Z","endDate":"2026-12-06T21:00:00Z","finalTimeline":{"rotations":[
@@ -269,15 +268,7 @@ func TestOperationsGetTimeline(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client, err := NewClient(
-		WithBaseURL(srv.URL),
-		WithCloudBaseURL(srv.URL),
-		WithOpsCloudID("cloud-1"),
-		WithTransport(transport.New()),
-	)
-	if err != nil {
-		t.Fatalf("new client: %v", err)
-	}
+	client := newTimelineClient(t, srv.URL)
 
 	got, err := client.Operations().GetTimeline(context.Background(), "sch-1", &GetTimelineOptions{
 		Date: "2026-11-30T00:00:00+03:00", Interval: 7, IntervalUnit: "days",
@@ -285,12 +276,18 @@ func TestOperationsGetTimeline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTimeline failed: %v", err)
 	}
+	if got.FinalTimeline == nil {
+		t.Fatal("finalTimeline is missing")
+	}
 
 	rotations := got.FinalTimeline.Rotations
 	if len(rotations) != 2 || len(rotations[0].Periods) != 0 || len(rotations[1].Periods) != 2 {
 		t.Fatalf("unexpected rotations: %+v", rotations)
 	}
 	override, team := rotations[1].Periods[0], rotations[1].Periods[1]
+	if override.Responder == nil || team.Responder == nil {
+		t.Fatalf("responder is missing: %+v %+v", override, team)
+	}
 	if override.Type != "override" || override.Responder.ID != "u-1" || override.StartDate != "2026-12-03T05:00:00Z" || override.EndDate != "2026-12-05T05:00:00Z" {
 		t.Fatalf("unexpected override period: %+v", override)
 	}
@@ -299,15 +296,42 @@ func TestOperationsGetTimeline(t *testing.T) {
 	}
 }
 
+func TestOperationsGetTimelineNilOptionsSendsNoQuery(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			t.Errorf("unexpected query: %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"finalTimeline":{"rotations":[]}}`))
+	}))
+	defer srv.Close()
+
+	if _, err := newTimelineClient(t, srv.URL).Operations().GetTimeline(context.Background(), "sch-1", nil); err != nil {
+		t.Fatalf("GetTimeline failed: %v", err)
+	}
+}
+
 func TestOperationsGetTimelineRequiresScheduleID(t *testing.T) {
 	t.Parallel()
 
-	client, err := NewClient(WithBaseURL("http://unused"), WithOpsCloudID("cloud-1"), WithTransport(transport.New()))
+	if _, err := newTimelineClient(t, "http://unused").Operations().GetTimeline(context.Background(), " ", nil); err == nil {
+		t.Fatal("expected an error for an empty schedule ID")
+	}
+}
+
+func newTimelineClient(t *testing.T, baseURL string) *Client {
+	t.Helper()
+
+	client, err := NewClient(
+		WithBaseURL(baseURL),
+		WithCloudBaseURL(baseURL),
+		WithOpsCloudID("cloud-1"),
+		WithTransport(transport.New()),
+	)
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}
-
-	if _, err := client.Operations().GetTimeline(context.Background(), " ", nil); err == nil {
-		t.Fatal("expected an error for an empty schedule ID")
-	}
+	return client
 }

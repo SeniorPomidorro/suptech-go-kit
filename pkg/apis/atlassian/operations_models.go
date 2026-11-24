@@ -131,20 +131,16 @@ type GetTimelineOptions struct {
 	Date         string
 	Interval     int
 	IntervalUnit string
-	Expand       []string
 }
 
 // ScheduleTimeline is a schedule's calculated on-call timeline.
 type ScheduleTimeline struct {
-	StartDate          string    `json:"startDate,omitempty"`
-	EndDate            string    `json:"endDate,omitempty"`
-	FinalTimeline      *Timeline `json:"finalTimeline,omitempty"`
-	BaseTimeline       *Timeline `json:"baseTimeline,omitempty"`
-	OverrideTimeline   *Timeline `json:"overrideTimeline,omitempty"`
-	ForwardingTimeline *Timeline `json:"forwardingTimeline,omitempty"`
+	StartDate     string    `json:"startDate,omitempty"`
+	EndDate       string    `json:"endDate,omitempty"`
+	FinalTimeline *Timeline `json:"finalTimeline,omitempty"`
 }
 
-// Timeline is one layer of a schedule timeline.
+// Timeline is the final layer of a schedule timeline, overrides and forwarding applied.
 type Timeline struct {
 	Rotations []TimelineRotation `json:"rotations,omitempty"`
 }
