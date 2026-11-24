@@ -246,3 +246,68 @@ func TestOperationsRequireCloudID(t *testing.T) {
 		t.Fatalf("expected missing cloud id error, got: %v", err)
 	}
 }
+
+func TestOperationsGetTimeline(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/jsm/ops/api/cloud-1/v1/schedules/sch-1/timeline" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		q := r.URL.Query()
+		if q.Get("date") != "2026-11-30T00:00:00+03:00" || q.Get("interval") != "7" || q.Get("intervalUnit") != "days" {
+			t.Fatalf("unexpected query: %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"startDate":"2026-11-29T21:00:00Z","endDate":"2026-12-06T21:00:00Z","finalTimeline":{"rotations":[
+			{"id":"rot-1","name":"Rotation1"},
+			{"id":"rot-2","name":"Rotation 2","periods":[
+				{"startDate":"2026-12-03T05:00:00Z","endDate":"2026-12-05T05:00:00Z","type":"override","responder":{"id":"u-1","type":"user"}},
+				{"startDate":"2026-12-05T05:00:00Z","endDate":"2026-12-06T21:00:00Z","type":"base","responder":{"id":"t-1","type":"team"},"flattenedResponders":[{"id":"u-2","type":"user"}]}
+			]}
+		]}}`))
+	}))
+	defer srv.Close()
+
+	client, err := NewClient(
+		WithBaseURL(srv.URL),
+		WithCloudBaseURL(srv.URL),
+		WithOpsCloudID("cloud-1"),
+		WithTransport(transport.New()),
+	)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	got, err := client.Operations().GetTimeline(context.Background(), "sch-1", &GetTimelineOptions{
+		Date: "2026-11-30T00:00:00+03:00", Interval: 7, IntervalUnit: "days",
+	})
+	if err != nil {
+		t.Fatalf("GetTimeline failed: %v", err)
+	}
+
+	rotations := got.FinalTimeline.Rotations
+	if len(rotations) != 2 || len(rotations[0].Periods) != 0 || len(rotations[1].Periods) != 2 {
+		t.Fatalf("unexpected rotations: %+v", rotations)
+	}
+	override, team := rotations[1].Periods[0], rotations[1].Periods[1]
+	if override.Type != "override" || override.Responder.ID != "u-1" || override.StartDate != "2026-12-03T05:00:00Z" || override.EndDate != "2026-12-05T05:00:00Z" {
+		t.Fatalf("unexpected override period: %+v", override)
+	}
+	if team.Responder.Type != "team" || len(team.FlattenedResponders) != 1 || team.FlattenedResponders[0].ID != "u-2" {
+		t.Fatalf("unexpected team period: %+v", team)
+	}
+}
+
+func TestOperationsGetTimelineRequiresScheduleID(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(WithBaseURL("http://unused"), WithOpsCloudID("cloud-1"), WithTransport(transport.New()))
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	if _, err := client.Operations().GetTimeline(context.Background(), " ", nil); err == nil {
+		t.Fatal("expected an error for an empty schedule ID")
+	}
+}

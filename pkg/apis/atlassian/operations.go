@@ -260,6 +260,47 @@ func (s *OperationsService) ListOnCalls(ctx context.Context, scheduleID string, 
 	return &result, nil
 }
 
+// GetTimeline returns a schedule's on-call periods for a window, overrides and forwarding applied in FinalTimeline.
+func (s *OperationsService) GetTimeline(ctx context.Context, scheduleID string, opts *GetTimelineOptions) (*ScheduleTimeline, error) {
+	if strings.TrimSpace(scheduleID) == "" {
+		return nil, errors.New("atlassian: schedule ID is required")
+	}
+
+	path, err := s.client.opsPath("/schedules/" + url.PathEscape(scheduleID) + "/timeline")
+	if err != nil {
+		return nil, err
+	}
+
+	if opts == nil {
+		opts = &GetTimelineOptions{}
+	}
+
+	query := url.Values{}
+	if strings.TrimSpace(opts.Date) != "" {
+		query.Set("date", opts.Date)
+	}
+	if opts.Interval > 0 {
+		query.Set("interval", strconv.Itoa(opts.Interval))
+	}
+	if strings.TrimSpace(opts.IntervalUnit) != "" {
+		query.Set("intervalUnit", opts.IntervalUnit)
+	}
+	for _, e := range opts.Expand {
+		query.Add("expand", e)
+	}
+
+	req, err := s.client.newCloudRequest(ctx, http.MethodGet, path, query, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result ScheduleTimeline
+	if err := s.client.transport.DoJSON(req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (c *Client) opsPath(pathSuffix string) (string, error) {
 	cloudID := strings.TrimSpace(c.opsCloudID)
 	if cloudID == "" {
