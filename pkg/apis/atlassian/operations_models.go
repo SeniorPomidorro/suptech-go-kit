@@ -126,6 +126,51 @@ type ListOnCallOptions struct {
 	Date string
 }
 
+// GetTimelineOptions controls the schedule timeline window; zero values take the API defaults (one week from now).
+type GetTimelineOptions struct {
+	Date         string
+	Interval     int
+	IntervalUnit string
+}
+
+// ScheduleTimeline is a schedule's calculated on-call timeline.
+type ScheduleTimeline struct {
+	StartDate     string    `json:"startDate,omitempty"`
+	EndDate       string    `json:"endDate,omitempty"`
+	FinalTimeline *Timeline `json:"finalTimeline,omitempty"`
+}
+
+// Timeline is the final layer of a schedule timeline, overrides and forwarding applied.
+type Timeline struct {
+	Rotations []TimelineRotation `json:"rotations,omitempty"`
+}
+
+// TimelineRotation lists a rotation's periods; the API omits periods when the window has none.
+type TimelineRotation struct {
+	ID      string           `json:"id,omitempty"`
+	Name    string           `json:"name,omitempty"`
+	Order   float64          `json:"order,omitempty"`
+	Deleted bool             `json:"deleted,omitempty"`
+	Periods []TimelinePeriod `json:"periods,omitempty"`
+}
+
+// TimelinePeriod is one on-call stretch; Type is base, override, forwarding or historical.
+type TimelinePeriod struct {
+	StartDate           string              `json:"startDate,omitempty"`
+	EndDate             string              `json:"endDate,omitempty"`
+	Type                string              `json:"type,omitempty"`
+	From                *TimelineResponder  `json:"from,omitempty"`
+	Responder           *TimelineResponder  `json:"responder,omitempty"`
+	FlattenedResponders []TimelineResponder `json:"flattenedResponders,omitempty"`
+}
+
+// TimelineResponder is who holds a period; Type is user, team, escalation or noone.
+type TimelineResponder struct {
+	ID      string `json:"id,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Deleted bool   `json:"deleted,omitempty"`
+}
+
 // NotificationRule represents an operations notification rule.
 type NotificationRule struct {
 	ID         string `json:"id,omitempty"`

@@ -171,7 +171,7 @@ _ = raw
 - Assets: `SearchObjectsAQL` (`FetchAll`), `CreateObject`, `DeleteObject`, `UpdateObject`, `GetObject`
   - Structured request types: `CreateAssetObjectRequest`, `UpdateAssetObjectRequest`
   - Simplified factory functions: `NewCreateAssetObjectRequest`, `NewUpdateAssetObjectRequest`
-- Operations: `CreateAlert`, `GetAlert`, `ListAlerts`, `EnableOpsForTeam`, `ListTeams`, `ListNotificationRules`, `ListSchedules`, `GetSchedule`, `ListOnCalls`
+- Operations: `CreateAlert`, `GetAlert`, `ListAlerts`, `EnableOpsForTeam`, `ListTeams`, `ListNotificationRules`, `ListSchedules`, `GetSchedule`, `ListOnCalls`, `GetTimeline`
 - Teams (Atlassian teams behind the Jira Team field, through the site gateway): `ListTeams`, `CreateTeam`, `LinkTeam` (sync members from a group), `RenameTeam`, `DeleteTeam`, each requiring the site id (the API needs it on some calls, though its spec calls it optional). `CreateTeam` is never retried, since a replayed create makes a second team
 
 ### `pkg/apis/slack`
